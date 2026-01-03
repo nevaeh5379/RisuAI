@@ -85,7 +85,7 @@ export const registerCBS = (monaco: any) => {
                 [/#(if|each|func|pure|pure_display|if_pure)/, 'keyword'],
 
                 // Standard keywords
-                [/[\w\/]+(?=\s|::|\}\})/, {
+                [/[a-zA-Z0-9_\/]+(?=\s|::|\}\}|\))/, {
                     cases: {
                         '@keywords': 'keyword',
                         '@default': 'identifier'
