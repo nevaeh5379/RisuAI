@@ -1,3 +1,269 @@
+<script lang="ts">
+    import { textAreaSize, textAreaTextSize } from 'src/ts/gui/guisize'
+    import { highlighter, getNewHighlightId, removeHighlight, AllCBS } from 'src/ts/gui/highlight'
+    import { isMobile } from 'src/ts/globalApi.svelte';
+    import { sleep } from 'src/ts/util';
+    import { onDestroy, onMount } from 'svelte';
+    import { disableHighlight, DBState, MobileGUI } from 'src/ts/stores.svelte';
+    import MonacoEditor from './MonacoEditor.svelte';
+
+    interface Props {
+        size?: 'xs'|'sm'|'md'|'lg'|'xl'|'default';
+        autocomplete?: 'on'|'off';
+        placeholder?: string;
+        value: string;
+        id?: string;
+        padding?: boolean;
+        margin?: "none"|"top"|"bottom"|"both";
+        onInput?: any;
+        fullwidth?: boolean;
+        height?: '20'|'24'|'28'|'32'|'36'|'full'|'default';
+        className?: string;
+        optimaizedInput?: boolean;
+        highlight?: boolean;
+        onchange?: () => void;
+    }
+
+    let {
+        size = 'default',
+        autocomplete = 'off',
+        placeholder = '',
+        value = $bindable(),
+        id = undefined,
+        padding = true,
+        margin = "none",
+        onInput = () => {},
+        fullwidth = false,
+        height = 'default',
+        className = '',
+        optimaizedInput = true,
+        highlight = false,
+        onchange = () => {}
+    }: Props = $props();
+
+    let selectingAutoComplete = $state(0)
+    // TODO: Review if highlight prop can change dynamically - if so, this needs to be reactive
+    // svelte-ignore state_referenced_locally
+    let highlightId = highlight ? getNewHighlightId() : 0
+    let inpa = $state(0)
+    let highlightDom: HTMLDivElement = $state()
+    let optiValue = $state(value)
+    let autoCompleteDom: HTMLDivElement = $state()
+    let autocompleteContents:string[] = $state([])
+    let inputDom: HTMLDivElement = $state()
+
+    const autoComplete = () => {
+        if(isMobile){
+            return
+        }
+        //autocomplete
+        selectingAutoComplete = 0
+        const sel = window.getSelection()
+        if(!sel){
+            return
+        }
+
+        const range = sel.getRangeAt(0)
+
+        if(range){
+            const qValue = (range.startContainer).textContent
+            const splited = qValue.substring(0, range.startOffset).split('{{')
+            if(splited.length === 1){
+                hideAutoComplete()
+                return
+            }
+            const qText = splited.pop()
+            let filtered = AllCBS.filter((cb) => cb.startsWith(qText))
+            if(filtered.length === 0){
+                hideAutoComplete()
+                return
+            }
+            filtered = filtered.slice(0, 10)
+            autocompleteContents = filtered
+        }
+
+        const hlRect = highlightDom.getBoundingClientRect()
+        const rect = range.getBoundingClientRect()
+        if(rect.top === 0 && rect.left === 0){
+            hideAutoComplete()
+            return
+        }
+        const top = rect.top - hlRect.top + 15
+        const left = rect.left - hlRect.left
+        autoCompleteDom.style.top = top + 'px'
+        autoCompleteDom.style.left = left + 'px'
+        autoCompleteDom.style.display = 'flex'
+    }
+
+    const insertContent = (insertContent:string, type:'autoComplete'|'paste' = 'autoComplete') => {
+        console.log(insertContent)
+        const sel = window.getSelection()
+        if(sel){
+            const range = sel.getRangeAt(0)
+            let content = (range.startContainer).textContent
+            let contentStart = content.substring(0, range.startOffset)
+            let contentEnd = content.substring(range.startOffset)
+            if(type === 'autoComplete'){
+                contentStart = contentStart.substring(0, contentStart.lastIndexOf('{{'))
+                if(insertContent.endsWith(':')){
+                    insertContent = `{{${insertContent}:`
+                }
+                else if(insertContent.startsWith('#')){
+                    insertContent = `{{${insertContent} `
+                }
+                else{
+                    insertContent = `{{${insertContent}}}`
+                }
+            }
+
+            const cons = contentStart + insertContent + contentEnd
+            range.startContainer.textContent = cons
+            hideAutoComplete()
+
+            try {
+                sel.collapse(range.startContainer, contentStart.length + insertContent.length)                
+            } catch (error) {}
+            //invoke onInput
+            
+            try {
+                inputDom.dispatchEvent(new Event('input'))
+                inputDom.dispatchEvent(new Event('change'))
+            } catch (error) {}
+        }
+    }
+
+    const hideAutoComplete = () => {
+        autoCompleteDom.style.display = 'none'
+        selectingAutoComplete = 0
+        autocompleteContents = []
+    }
+
+    onMount(() => {
+        if (!DBState.db.useMonacoEditor || $MobileGUI) {
+            highlighter(highlightDom, highlightId)
+        }
+    })
+
+    onDestroy(() => {
+        if (!DBState.db.useMonacoEditor || $MobileGUI) {
+            removeHighlight(highlightId)
+        }
+    })
+
+    const highlightChange = async (value:string, highlightId:number) => {
+        if (!DBState.db.useMonacoEditor || $MobileGUI) {
+            await sleep(1)
+            highlighter(highlightDom, highlightId)
+        }
+    }
+
+    const handleKeyDown = (e:KeyboardEvent) => {
+        if(autocompleteContents.length >= 1){
+            switch(e.key){
+                case 'ArrowDown':
+                    selectingAutoComplete = Math.min(selectingAutoComplete + 1, autocompleteContents.length - 1)
+                    e.preventDefault()
+                    return
+                case 'ArrowUp':
+                    selectingAutoComplete = Math.max(selectingAutoComplete - 1, 0)
+                    e.preventDefault()
+                    return
+                case 'Enter':
+                case 'Tab':
+                    e.preventDefault()
+                    insertContent(autocompleteContents[selectingAutoComplete])
+                    return
+                case 'Escape':
+                    hideAutoComplete()
+                    return
+            }
+        }
+        if(e.key === 'Enter'){
+            e.stopPropagation()
+            e.preventDefault()
+            insertTextAtSelection('\n')
+        }
+    }
+
+    function insertTextAtSelection(txt:string) {
+
+        txt = txt.replace(/\r/g, '')
+
+        let div = inputDom;
+        let sel = window.getSelection();
+        let text = div.textContent;
+        let before = Math.min(sel.focusOffset, sel.anchorOffset);
+        let after = Math.max(sel.focusOffset, sel.anchorOffset);
+        let afterStr = text.substring(after);
+        if (afterStr == "") afterStr = "\n";
+        div.textContent = text.substring(0, before) + txt + afterStr;
+        sel.removeAllRanges();
+        let range = document.createRange();
+        range.setStart(div.childNodes[0], before + txt.length);
+        range.setEnd(div.childNodes[0], before + txt.length);
+        sel.addRange(range);
+        try {
+            inputDom.dispatchEvent(new Event('input'))
+            inputDom.dispatchEvent(new Event('change'))
+        } catch (error) {}
+    }
+        
+    $effect.pre(() => {
+        optiValue = value
+    });
+    $effect.pre(() => {
+        highlightChange(value, highlightId)
+    });
+
+    function getPixelHeight(): string {
+        if (height === 'full') return '100%';
+        
+        let pixelHeight = 200; // default backup
+        
+        if (height === 'default') {
+            // Base height for 'default' (0) is roughly 160px (h-40)
+            // Each step is 16px (1rem)
+            // $textAreaSize ranges from -5 to 5
+            pixelHeight = 160 + ($textAreaSize * 16);
+        } else {
+            // height is a string like '20', '24' ... '60'
+            // In Tailwind: number * 0.25rem. 1rem = 16px.
+            // So number * 4px.
+            const h = parseInt(height);
+            if (!isNaN(h)) {
+                pixelHeight = h * 4;
+            }
+        }
+        
+        // Ensure a minimum usable height for code editor
+        return Math.max(pixelHeight, 80) + 'px';
+    }
+
+</script>
+
+{#if DBState.db.useMonacoEditor && !$MobileGUI}
+    <div class={"border border-darkborderc relative n-scroll focus-within:border-borderc rounded-md shadow-xs text-textcolor bg-transparent focus-within:ring-borderc focus-within:ring-2 focus-within:outline-hidden transition-colors duration-200 z-20 focus-within:z-40 " + ((className) ? (' ' + className) : '')}
+        class:mb-4={margin === 'bottom'}
+        class:mb-2={margin === 'both'}
+        class:mt-4={margin === 'top'}
+        class:mt-2={margin === 'both'}
+        style="height: {height === 'full' ? '100%' : 'auto'};"
+    >
+        <MonacoEditor 
+            bind:value={value} 
+            height={getPixelHeight()}
+            autoResize={false}
+            resizable={true}
+            options={{
+                minimap: { enabled: false },
+                wordWrap: 'on',
+                lineNumbers: 'off',
+                folding: false,
+            }}
+            onInput={onInput}
+        />
+    </div>
+{:else}
 <div 
     class={"border border-darkborderc relative n-scroll focus-within:border-borderc rounded-md shadow-xs text-textcolor bg-transparent focus-within:ring-borderc focus-within:ring-2 focus-within:outline-hidden transition-colors duration-200 z-20 focus-within:z-40" + ((className) ? (' ' + className) : '')} 
     class:text-sm={size === 'sm' || (size === 'default' && $textAreaTextSize === 1)}
@@ -97,212 +363,4 @@
         {/each}
     </div>
 </div>
-<script lang="ts">
-    import { textAreaSize, textAreaTextSize } from 'src/ts/gui/guisize'
-    import { highlighter, getNewHighlightId, removeHighlight, AllCBS } from 'src/ts/gui/highlight'
-    import { isMobile } from 'src/ts/globalApi.svelte';
-    import { sleep } from 'src/ts/util';
-    import { onDestroy, onMount } from 'svelte';
-  import { disableHighlight } from 'src/ts/stores.svelte';
-    interface Props {
-        size?: 'xs'|'sm'|'md'|'lg'|'xl'|'default';
-        autocomplete?: 'on'|'off';
-        placeholder?: string;
-        value: string;
-        id?: string;
-        padding?: boolean;
-        margin?: "none"|"top"|"bottom"|"both";
-        onInput?: any;
-        fullwidth?: boolean;
-        height?: '20'|'24'|'28'|'32'|'36'|'full'|'default';
-        className?: string;
-        optimaizedInput?: boolean;
-        highlight?: boolean;
-        onchange?: () => void;
-    }
-
-    let {
-        size = 'default',
-        autocomplete = 'off',
-        placeholder = '',
-        value = $bindable(),
-        id = undefined,
-        padding = true,
-        margin = "none",
-        onInput = () => {},
-        fullwidth = false,
-        height = 'default',
-        className = '',
-        optimaizedInput = true,
-        highlight = false,
-        onchange = () => {}
-    }: Props = $props();
-    let selectingAutoComplete = $state(0)
-    // TODO: Review if highlight prop can change dynamically - if so, this needs to be reactive
-    // svelte-ignore state_referenced_locally
-    let highlightId = highlight ? getNewHighlightId() : 0
-    let inpa = $state(0)
-    let highlightDom: HTMLDivElement = $state()
-    let optiValue = $state(value)
-    let autoCompleteDom: HTMLDivElement = $state()
-    let autocompleteContents:string[] = $state([])
-    let inputDom: HTMLDivElement = $state()
-
-    const autoComplete = () => {
-        if(isMobile){
-            return
-        }
-        //autocomplete
-        selectingAutoComplete = 0
-        const sel = window.getSelection()
-        if(!sel){
-            return
-        }
-
-        const range = sel.getRangeAt(0)
-
-        if(range){
-            const qValue = (range.startContainer).textContent
-            const splited = qValue.substring(0, range.startOffset).split('{{')
-            if(splited.length === 1){
-                hideAutoComplete()
-                return
-            }
-            const qText = splited.pop()
-            let filtered = AllCBS.filter((cb) => cb.startsWith(qText))
-            if(filtered.length === 0){
-                hideAutoComplete()
-                return
-            }
-            filtered = filtered.slice(0, 10)
-            autocompleteContents = filtered
-        }
-
-        const hlRect = highlightDom.getBoundingClientRect()
-        const rect = range.getBoundingClientRect()
-        if(rect.top === 0 && rect.left === 0){
-            hideAutoComplete()
-            return
-        }
-        const top = rect.top - hlRect.top + 15
-        const left = rect.left - hlRect.left
-        autoCompleteDom.style.top = top + 'px'
-        autoCompleteDom.style.left = left + 'px'
-        autoCompleteDom.style.display = 'flex'
-    }
-
-    const insertContent = (insertContent:string, type:'autoComplete'|'paste' = 'autoComplete') => {
-        console.log(insertContent)
-        const sel = window.getSelection()
-        if(sel){
-            const range = sel.getRangeAt(0)
-            let content = (range.startContainer).textContent
-            let contentStart = content.substring(0, range.startOffset)
-            let contentEnd = content.substring(range.startOffset)
-            if(type === 'autoComplete'){
-                contentStart = contentStart.substring(0, contentStart.lastIndexOf('{{'))
-                if(insertContent.endsWith(':')){
-                    insertContent = `{{${insertContent}:`
-                }
-                else if(insertContent.startsWith('#')){
-                    insertContent = `{{${insertContent} `
-                }
-                else{
-                    insertContent = `{{${insertContent}}}`
-                }
-            }
-
-            const cons = contentStart + insertContent + contentEnd
-            range.startContainer.textContent = cons
-            hideAutoComplete()
-
-            try {
-                sel.collapse(range.startContainer, contentStart.length + insertContent.length)                
-            } catch (error) {}
-            //invoke onInput
-            
-            try {
-                inputDom.dispatchEvent(new Event('input'))
-                inputDom.dispatchEvent(new Event('change'))
-            } catch (error) {}
-        }
-    }
-
-    const hideAutoComplete = () => {
-        autoCompleteDom.style.display = 'none'
-        selectingAutoComplete = 0
-        autocompleteContents = []
-    }
-
-    onMount(() => {
-        highlighter(highlightDom, highlightId)
-    })
-
-    onDestroy(() => {
-        removeHighlight(highlightId)
-    })
-
-    const highlightChange = async (value:string, highlightId:number) => {
-        await sleep(1)
-        highlighter(highlightDom, highlightId)
-    }
-
-    const handleKeyDown = (e:KeyboardEvent) => {
-        if(autocompleteContents.length >= 1){
-            switch(e.key){
-                case 'ArrowDown':
-                    selectingAutoComplete = Math.min(selectingAutoComplete + 1, autocompleteContents.length - 1)
-                    e.preventDefault()
-                    return
-                case 'ArrowUp':
-                    selectingAutoComplete = Math.max(selectingAutoComplete - 1, 0)
-                    e.preventDefault()
-                    return
-                case 'Enter':
-                case 'Tab':
-                    e.preventDefault()
-                    insertContent(autocompleteContents[selectingAutoComplete])
-                    return
-                case 'Escape':
-                    hideAutoComplete()
-                    return
-            }
-        }
-        if(e.key === 'Enter'){
-            e.stopPropagation()
-            e.preventDefault()
-            insertTextAtSelection('\n')
-        }
-    }
-
-    function insertTextAtSelection(txt:string) {
-
-        txt = txt.replace(/\r/g, '')
-
-        let div = inputDom;
-        let sel = window.getSelection();
-        let text = div.textContent;
-        let before = Math.min(sel.focusOffset, sel.anchorOffset);
-        let after = Math.max(sel.focusOffset, sel.anchorOffset);
-        let afterStr = text.substring(after);
-        if (afterStr == "") afterStr = "\n";
-        div.textContent = text.substring(0, before) + txt + afterStr;
-        sel.removeAllRanges();
-        let range = document.createRange();
-        range.setStart(div.childNodes[0], before + txt.length);
-        range.setEnd(div.childNodes[0], before + txt.length);
-        sel.addRange(range);
-        try {
-            inputDom.dispatchEvent(new Event('input'))
-            inputDom.dispatchEvent(new Event('change'))
-        } catch (error) {}
-    }
-        
-    $effect.pre(() => {
-        optiValue = value
-    });
-    $effect.pre(() => {
-        highlightChange(value, highlightId)
-    });
-
-</script>
+{/if}

@@ -357,6 +357,7 @@ export function setDatabase(data:Database){
     }
     data.globalscript ??= []
     data.sendWithEnter ??= true
+    data.useMonacoEditor ??= false
     data.autoSuggestPrompt ??= defaultAutoSuggestPrompt
     data.autoSuggestPrefix ??= ""
     data.OAIPrediction ??= ''
@@ -809,6 +810,7 @@ export interface Database{
     globalscript: customscript[],
     sendWithEnter:boolean
     fixedChatTextarea:boolean
+    useMonacoEditor:boolean
     clickToEdit: boolean
     koboldURL:string
     advancedBotSettings:boolean

@@ -45,6 +45,13 @@ export const accessibilitySettingsItems: SettingItem[] = [
         keywords: ['send', 'enter', 'keyboard', 'submit']
     },
     {
+        id: 'acc.useMonacoEditor',
+        type: 'check',
+        labelKey: 'useMonacoEditor',
+        bindKey: 'useMonacoEditor',
+        keywords: ['monaco', 'editor', 'code', 'highlight']
+    },
+    {
         id: 'acc.fixedChatTextarea',
         type: 'check',
         labelKey: 'fixedChatTextarea',

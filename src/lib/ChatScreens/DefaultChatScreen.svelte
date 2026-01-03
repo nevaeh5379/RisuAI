@@ -3,7 +3,8 @@
     import Suggestion from './Suggestion.svelte';
     import AdvancedChatEditor from './AdvancedChatEditor.svelte';
     import { CameraIcon, DatabaseIcon, DicesIcon, GlobeIcon, ImagePlusIcon, LanguagesIcon, Laugh, MenuIcon, MicOffIcon, PackageIcon, Plus, RefreshCcwIcon, ReplyIcon, Send, StepForwardIcon, XIcon, BrainIcon } from "@lucide/svelte";
-    import { selectedCharID, PlaygroundStore, createSimpleCharacter, hypaV3ModalOpen } from "../../ts/stores.svelte";
+    import MonacoEditor from '../UI/GUI/MonacoEditor.svelte';
+    import { selectedCharID, PlaygroundStore, createSimpleCharacter, hypaV3ModalOpen, MobileGUI } from "../../ts/stores.svelte";
     import Chat from "./Chat.svelte";
     import { type Message } from "../../ts/storage/database.svelte";
     import { DBState } from 'src/ts/stores.svelte';
@@ -456,66 +457,134 @@
                 {/if}
 
                 {#if !DBState.db.useAdvancedEditor}
-                <textarea class="peer text-input-area focus:border-textcolor transition-colors outline-hidden text-textcolor p-2 min-w-0 border border-r-0 bg-transparent rounded-md rounded-r-none input-text text-xl grow ml-4 border-darkborderc resize-none overflow-y-hidden overflow-x-hidden max-w-full placeholder:text-sm"
-                          bind:value={messageInput}
-                          bind:this={inputEle}
-                          onkeydown={(e) => {
-                        if(e.key.toLocaleLowerCase() === "enter" && !e.isComposing){
-                            if(DBState.db.sendWithEnter && (!e.shiftKey)){
-                                send()
-                                e.preventDefault()
-                            }else if(!DBState.db.sendWithEnter && e.shiftKey){
-                                send()
-                                e.preventDefault()
-                            }
-                        }
-                        if(e.key.toLocaleLowerCase() === "m" && (e.ctrlKey)){
-                            reroll()
-                            e.preventDefault()
-                        }
-                    }}
-                          onpaste={(e) => {
-                        const items = e.clipboardData?.items
-                        if(!items){
-                            return
-                        }
-                        let canceled = false
-
-                        for(const item of items){
-                            if(item.kind === 'file' && item.type.startsWith('image')){
-                                if(!canceled){
-                                    e.preventDefault()
-                                    canceled = true
-                                }
-                                const file = item.getAsFile()
-                                if(file){
-                                    const reader = new FileReader()
-                                    reader.onload = async (e) => {
-                                        const buf = e.target?.result as ArrayBuffer
-                                        const uint8 = new Uint8Array(buf)
-                                        const results = await postChatFile({
-                                            name: file.name,
-                                            data: uint8
-                                        })
-                                        if(!results) return
-                                        for(const res of results){
-                                            if(res?.type === 'asset'){
-                                                fileInput.push(res.data)
-                                            }
-                                            if(res?.type === 'text'){
-                                                messageInput += `{{file::${res.name}::${res.data}}}`
-                                            }
-                                        }
-                                        updateInputSizeAll()
+                    {#if !$MobileGUI && DBState.db.useMonacoEditor}
+                        <MonacoEditor 
+                            bind:value={messageInput}
+                            bind:height={inputHeight}
+                            options={{
+                                padding: { top: 10, bottom: 10 },
+                                fontSize: 16,
+                                renderLineHighlight: 'none',
+                            }}
+                            onInput={()=>{updateInputSizeAll();updateInputTransateMessage(false)}}
+                            onKeyDown={(e) => {
+                                const evt = e.browserEvent;
+                                if(evt.key.toLowerCase() === "enter" && !evt.isComposing){
+                                    if(DBState.db.sendWithEnter && (!evt.shiftKey)){
+                                        send()
+                                        evt.preventDefault()
+                                    }else if(!DBState.db.sendWithEnter && evt.shiftKey){
+                                        send()
+                                        evt.preventDefault()
                                     }
-                                    reader.readAsArrayBuffer(file)
                                 }
-                            }
-                        }
-                    }}
-                          oninput={()=>{updateInputSizeAll();updateInputTransateMessage(false)}}
-                          style:height={inputHeight}
-                ></textarea>
+                                if(evt.key.toLowerCase() === "m" && (evt.ctrlKey)){
+                                    reroll()
+                                    evt.preventDefault()
+                                }
+                            }}
+                            onPaste={(e) => {
+                                const items = e.clipboardData?.items
+                                if(!items){
+                                    return
+                                }
+                                let canceled = false
+
+                                for(const item of items){
+                                    if(item.kind === 'file' && item.type.startsWith('image')){
+                                        if(!canceled){
+                                            e.preventDefault()
+                                            canceled = true
+                                        }
+                                        const file = item.getAsFile()
+                                        if(file){
+                                            const reader = new FileReader()
+                                            reader.onload = async (e) => {
+                                                const buf = e.target?.result as ArrayBuffer
+                                                const uint8 = new Uint8Array(buf)
+                                                const results = await postChatFile({
+                                                    name: file.name,
+                                                    data: uint8
+                                                })
+                                                if(!results) return
+                                                for(const res of results){
+                                                    if(res?.type === 'asset'){
+                                                        fileInput.push(res.data)
+                                                    }
+                                                    if(res?.type === 'text'){
+                                                        messageInput += `{{file::${res.name}::${res.data}}}`
+                                                    }
+                                                }
+                                                updateInputSizeAll()
+                                            }
+                                            reader.readAsArrayBuffer(file)
+                                        }
+                                    }
+                                }
+                            }}
+                        />
+                    {:else}
+                        <textarea class="peer text-input-area focus:border-textcolor transition-colors outline-hidden text-textcolor p-2 min-w-0 border border-r-0 bg-transparent rounded-md rounded-r-none input-text text-xl grow ml-4 border-darkborderc resize-none overflow-y-hidden overflow-x-hidden max-w-full placeholder:text-sm"
+                                  bind:value={messageInput}
+                                  bind:this={inputEle}
+                                  onkeydown={(e) => {
+                                if(e.key.toLocaleLowerCase() === "enter" && !e.isComposing){
+                                    if(DBState.db.sendWithEnter && (!e.shiftKey)){
+                                        send()
+                                        e.preventDefault()
+                                    }else if(!DBState.db.sendWithEnter && e.shiftKey){
+                                        send()
+                                        e.preventDefault()
+                                    }
+                                }
+                                if(e.key.toLocaleLowerCase() === "m" && (e.ctrlKey)){
+                                    reroll()
+                                    e.preventDefault()
+                                }
+                            }}
+                                  onpaste={(e) => {
+                                const items = e.clipboardData?.items
+                                if(!items){
+                                    return
+                                }
+                                let canceled = false
+
+                                for(const item of items){
+                                    if(item.kind === 'file' && item.type.startsWith('image')){
+                                        if(!canceled){
+                                            e.preventDefault()
+                                            canceled = true
+                                        }
+                                        const file = item.getAsFile()
+                                        if(file){
+                                            const reader = new FileReader()
+                                            reader.onload = async (e) => {
+                                                const buf = e.target?.result as ArrayBuffer
+                                                const uint8 = new Uint8Array(buf)
+                                                const results = await postChatFile({
+                                                    name: file.name,
+                                                    data: uint8
+                                                })
+                                                if(!results) return
+                                                for(const res of results){
+                                                    if(res?.type === 'asset'){
+                                                        fileInput.push(res.data)
+                                                    }
+                                                    if(res?.type === 'text'){
+                                                        messageInput += `{{file::${res.name}::${res.data}}}`
+                                                    }
+                                                }
+                                                updateInputSizeAll()
+                                            }
+                                            reader.readAsArrayBuffer(file)
+                                        }
+                                    }
+                                }
+                            }}
+                                  oninput={()=>{updateInputSizeAll();updateInputTransateMessage(false)}}
+                                  style:height={inputHeight}
+                        ></textarea>
+                    {/if}
                 {:else}
                     <AdvancedChatEditor
                             bind:value={messageInput}
