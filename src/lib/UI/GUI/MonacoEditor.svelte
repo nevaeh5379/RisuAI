@@ -3,6 +3,8 @@
     import loader from '@monaco-editor/loader';
     import { DBState } from 'src/ts/stores.svelte';
     import { registerCBS } from './cbsLanguage';
+    import { validateCBS } from './cbsValidator';
+    import { debounce } from 'lodash';
 
     let { 
         value = $bindable(), 
@@ -54,6 +56,14 @@
             ...options
         });
 
+        const validate = debounce(() => {
+            const model = editor.getModel();
+            if (model && model.getLanguageId() === 'risuai-cbs') {
+                const markers = validateCBS(model.getValue());
+                monaco.editor.setModelMarkers(model, 'cbs', markers);
+            }
+        }, 500);
+
         // Sync value from editor to prop
         editor.onDidChangeModelContent(() => {
             const val = editor.getValue();
@@ -64,7 +74,10 @@
             if (autoResize) {
                 updateHeight();
             }
+            validate();
         });
+
+        validate(); // Initial check
 
         editor.onKeyDown((e: any) => {
             onKeyDown(e);

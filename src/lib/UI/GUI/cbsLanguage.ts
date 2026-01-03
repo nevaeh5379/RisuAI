@@ -3,6 +3,31 @@ import { normalCBS, normalCBSwithParams, displayRelatedCBS, nestedCBS, specialCB
 export const registerCBS = (monaco: any) => {
     monaco.languages.register({ id: 'risuai-cbs' });
 
+    monaco.languages.setLanguageConfiguration('risuai-cbs', {
+        brackets: [
+            ['{{', '}}'],
+            ['<', '>'], // for HTML tags
+        ],
+        autoClosingPairs: [
+            { open: '{{', close: '}}' },
+            { open: '<', close: '>' },
+            { open: '"', close: '"' },
+            { open: "'", close: "'" },
+            { open: '`', close: '`' },
+            { open: '(', close: ')' },
+            { open: '[', close: ']' },
+        ],
+        surroundingPairs: [
+            { open: '{{', close: '}}' },
+            { open: '<', close: '>' },
+            { open: '"', close: '"' },
+            { open: "'", close: "'" },
+            { open: '`', close: '`' },
+            { open: '(', close: ')' },
+            { open: '[', close: ']' },
+        ]
+    });
+
     monaco.languages.setMonarchTokensProvider('risuai-cbs', {
         defaultToken: '',
         tokenPostfix: '.cbs',
