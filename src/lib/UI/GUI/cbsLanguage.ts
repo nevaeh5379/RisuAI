@@ -37,7 +37,7 @@ export const registerCBS = (monaco: any) => {
             ...normalCBS,
             ...normalCBSwithParams,
             ...displayRelatedCBS.map(k => k.replace(/:$/, '')),
-            ...nestedCBS.map(k => k.replace(/^#/, '')), // special handling for #
+            ...nestedCBS.map(k => k.replace(/^#/, '').trim()), // special handling for #
             ...specialCBS.map(k => k.replace(/:$/, '').replace(/\?/, '')),
             ...deprecatedCBS,
             ...deprecatedCBSwithParams
@@ -85,7 +85,7 @@ export const registerCBS = (monaco: any) => {
                 [/#(if|each|func|pure|pure_display|if_pure)/, 'keyword'],
 
                 // Standard keywords
-                [/[a-zA-Z0-9_]+(?=\s|::|\}\})/, {
+                [/[\w\/]+(?=\s|::|\}\})/, {
                     cases: {
                         '@keywords': 'keyword',
                         '@default': 'identifier'
