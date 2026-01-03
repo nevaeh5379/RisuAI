@@ -78,11 +78,11 @@ export const registerCBS = (monaco: any) => {
                 // Comments
                 [/\/\/.*$/, 'comment'],
                 
-                // Separators
-                [/::/, 'delimiter'],
+                // Separators: switch to params mode to avoid keyword highlighting in args
+                [/::/, { token: 'delimiter', switchTo: '@params' }],
                 
-                // Keywords starting with #
-                [/#(if|each|func|pure|pure_display|if_pure)/, 'keyword'],
+                // Keywords starting with # (ordered longest first)
+                [/#(if_pure|pure_display|if|each|func|pure)/, 'keyword'],
 
                 // Standard keywords
                 [/[a-zA-Z0-9_\/]+/, {
@@ -93,6 +93,24 @@ export const registerCBS = (monaco: any) => {
                 }],
                 
                 // Strings/Arguments
+                [/[^\{\}]+/, 'string']
+            ],
+
+            params: [
+                [/\{\{/, { token: 'delimiter.cbs', next: '@cbs' }], // Start nested command
+                [/\}\}/, { token: 'delimiter.cbs', next: '@pop' }], // End current command
+                
+                // Comments inside params? Possible.
+                [/\/\/.*$/, 'comment'],
+
+                [/::/, 'delimiter'],
+                
+                // In params, we don't check for keywords. Just strings/identifiers.
+                // We use 'variable' color (Blue) for identifiers to look consistent with vars, 
+                // or 'string' (Orange) for literal text.
+                // The user complained about 'scenario' being Pink (keyword). 
+                // Let's make text in params 'string' (Orange) or 'identifier' (Blue).
+                // Usually args are values.
                 [/[^\{\}]+/, 'string']
             ]
         }
