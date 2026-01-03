@@ -28,7 +28,7 @@
         size = 'default',
         autocomplete = 'off',
         placeholder = '',
-        value = $bindable(''),
+        value = $bindable(),
         id = undefined,
         padding = true,
         margin = "none",
@@ -212,7 +212,7 @@
         optiValue = value
     });
     $effect.pre(() => {
-        highlightChange(value, highlightId)
+        highlightChange(value ?? '', highlightId)
     });
 
     function getPixelHeight(): string {

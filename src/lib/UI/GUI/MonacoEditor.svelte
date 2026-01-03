@@ -4,7 +4,7 @@
     import { DBState } from 'src/ts/stores.svelte';
 
     let { 
-        value = $bindable(''), 
+        value = $bindable(), 
         height = $bindable("200px"), 
         language = "markdown", 
         options = {},
@@ -30,7 +30,7 @@
         if (!editorContainer) return;
 
         editor = monaco.editor.create(editorContainer, {
-            value: value,
+            value: value ?? '',
             language: language,
             theme: 'vs-dark', 
             automaticLayout: false, // We use ResizeObserver
@@ -89,8 +89,8 @@
 
     // Sync value from prop to editor
     $effect(() => {
-        if (editor && value !== editor.getValue()) {
-            editor.setValue(value);
+        if (editor && (value ?? '') !== editor.getValue()) {
+            editor.setValue(value ?? '');
             if (autoResize) {
                 updateHeight();
             }
