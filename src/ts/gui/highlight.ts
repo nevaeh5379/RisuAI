@@ -130,7 +130,7 @@ export const removeHighlight = (id:number) => {
     highLights.delete(id)
 }
 
-const normalCBS = [
+export const normalCBS = [
     'char', 'user', 'char_persona', 'description', 'char_desc', 'example_dialogue', 'previous_char_chat',
     'lastcharmessage', 'previous_user_chat', 'lastusermessage',
     'example_message', 'persona', 'user_persona', 'lorebook', 'world_info', 'history', 'messages',
@@ -141,7 +141,7 @@ const normalCBS = [
     'is_first_message', '/', '/if', '/each', '/pure', '/if_pure', '/func', '/pure_display'
 ]
 
-const normalCBSwithParams = [
+export const normalCBSwithParams = [
     'getvar', 'calc', 'addvar', 'setvar', 'setdefaultvar', 'button', 'equal', 'not_equal', 'file',
     'startswith', 'endswith', 'contains', 'replace', 'split', 'join', 'spread', 'trim', 'length',
     'arraylength', 'array_length', 'lower', 'upper', 'capitalize', 'round', 'floor', 'ceil', 'abs',
@@ -152,23 +152,23 @@ const normalCBSwithParams = [
     'and', 'or', 'not', 'message_time_array', 'filter', 'greater', 'less', 'greater_equal', 'less_equal', 'arg'
 ]
 
-const displayRelatedCBS = [
+export const displayRelatedCBS = [
     'raw', 'img', 'video', 'audio', 'bg', 'emotion', 'asset', 'video-img', 'comment', 'image'
 ];
 
-const nestedCBS = [
+export const nestedCBS = [
     '#if', '#if_pure ', '#pure ', '#each ', '#func', '#pure_display'
 ]
 
-const specialCBS = [
+export const specialCBS = [
     'random:', 'pick:', 'roll:', 'datetimeformat:', '? ', 'hidden_key: ', 'reverse: ', ...nestedCBS
 ]
 
-const deprecatedCBS = [
+export const deprecatedCBS = [
     'personality', 'scenario', 'main_prompt', 'system_prompt', 'ujb', 'global_note', 'system_note',
 ]
 
-const deprecatedCBSwithParams = [
+export const deprecatedCBSwithParams = [
     'remaind', 'pow'
 ]
 
@@ -178,7 +178,7 @@ export const decorators = [
     'additional_keys', 'exclude_keys', 'is_user_icon', 'activate', 'dont_activate', 'disable_ui_prompt', 'probability', 'exclude_keys_all', 'match_full_word', 'match_partial_word'
 ]
 
-const deprecatedDecorators = [
+export const deprecatedDecorators = [
     'end', 'assistant', 'user', 'system'
 ]
 

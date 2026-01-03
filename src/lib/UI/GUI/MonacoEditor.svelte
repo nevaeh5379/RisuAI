@@ -2,6 +2,7 @@
     import { onMount, onDestroy } from 'svelte';
     import loader from '@monaco-editor/loader';
     import { DBState } from 'src/ts/stores.svelte';
+    import { registerCBS } from './cbsLanguage';
 
     let { 
         value = $bindable(), 
@@ -27,12 +28,14 @@
         // Load Monaco
         monaco = await loader.init();
 
+        registerCBS(monaco);
+
         if (!editorContainer) return;
 
         editor = monaco.editor.create(editorContainer, {
             value: value ?? '',
-            language: language,
-            theme: 'vs-dark', 
+            language: language === 'markdown' ? 'risuai-cbs' : language,
+            theme: 'risu-cbs-dark', 
             automaticLayout: false, // We use ResizeObserver
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
@@ -110,15 +113,26 @@
 
     function updateTheme() {
         if (!monaco || !editor) return;
-        monaco.editor.defineTheme('risu-dark', {
+        // Theme is already defined in registerCBS, just apply it or ensure transparent background if needed
+        // But registerCBS defines 'risu-cbs-dark'.
+        // If we want to support dynamic transparency, we can redefine or update it.
+        monaco.editor.defineTheme('risu-cbs-dark-transparent', {
             base: 'vs-dark',
             inherit: true,
-            rules: [],
+            rules: [
+                { token: 'delimiter.cbs', foreground: 'FFD700' }, 
+                { token: 'keyword', foreground: 'C586C0' }, 
+                { token: 'identifier', foreground: '9CDCFE' }, 
+                { token: 'string', foreground: 'CE9178' }, 
+                { token: 'comment', foreground: '6A9955' }, 
+                { token: 'tag', foreground: '808080' },
+                { token: 'annotation', foreground: 'DCDCAA' }
+            ],
             colors: {
                 'editor.background': '#00000000', 
             }
         });
-        editor.updateOptions({ theme: 'risu-dark' });
+        editor.updateOptions({ theme: 'risu-cbs-dark-transparent' });
     }
 
     onDestroy(() => {
