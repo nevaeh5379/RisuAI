@@ -1,11 +1,24 @@
 import { normalCBS, normalCBSwithParams, displayRelatedCBS, nestedCBS, specialCBS, deprecatedCBS, deprecatedCBSwithParams, decorators } from "src/ts/gui/highlight";
 
-// Flatten lists for easy checking
+// Categorize commands
+const spaceCommands = new Set([
+    'if', 'each', 'pure', 'if_pure', 'func', 'pure_display',
+    '/if', '/each', '/pure', '/if_pure', '/func', '/pure_display',
+    ...nestedCBS.map(k => k.trim())
+]);
+
+const paramsCommands = new Set([
+    ...normalCBSwithParams,
+    ...displayRelatedCBS.map(k => k.replace(/:$/, '')),
+    ...deprecatedCBSwithParams
+]);
+
+// All valid keywords (for unknown check)
 const validKeywords = new Set([
     ...normalCBS,
     ...normalCBSwithParams,
     ...displayRelatedCBS.map(k => k.replace(/:$/, '')),
-    ...nestedCBS.map(k => k.trim()), // #if, #each, etc.
+    ...nestedCBS.map(k => k.trim()),
     ...specialCBS.map(k => k.replace(/:$/, '').replace(/\?/, '').trim()),
     ...deprecatedCBS,
     ...deprecatedCBSwithParams
@@ -29,10 +42,6 @@ export const validateCBS = (text: string): ValidationResult[] => {
     const markers: ValidationResult[] = [];
     const lines = text.split('\n');
     const stack: { line: number, col: number, index: number }[] = [];
-    
-    // Iterate through text to find {{ and }}
-    // We need precise positioning, so it's easier to iterate char by char or use regex with indices
-    // But regex for nested structures is hard. State machine is better.
 
     let line = 1;
     let col = 1;
@@ -50,56 +59,92 @@ export const validateCBS = (text: string): ValidationResult[] => {
         if (char === '{' && nextChar === '{') {
             stack.push({ line, col, index: i });
             
-            // Check keyword immediately after {{
-            // Skip {{
+            // Keyword extraction
             let j = i + 2;
             let keyStart = j;
-            // Skip whitespace
-            // while (j < text.length && /\s/.test(text[j])) j++;
             
             // Capture keyword until ::, }}, or whitespace
             while (j < text.length) {
                 if (text[j] === '}' && text[j+1] === '}') break;
                 if (text.substring(j, j+2) === '::') break;
-                if (/\s/.test(text[j])) break; // Basic keyword end
+                if (/\s/.test(text[j])) break; 
                 j++;
             }
             
             const keyword = text.substring(keyStart, j).trim();
-            // Clean keyword (remove ?, # if needed for check, though our set has them)
-            // Our set has #if, but text might be {{#if ...}}
-            // If keyword is not empty and not a variable/macro that might be dynamic
-            if (keyword && !validKeywords.has(keyword) && !keyword.startsWith('//')) {
-                // Heuristic: only flag if it looks like a command (no spaces inside, etc)
-                // And maybe it's just a variable lookup {{varName}}. 
-                // RisuAI variables are often just strings.
-                // So "Unknown keyword" might be too aggressive for {{character_name}}.
-                // But validKeywords includes 'char', 'user'.
-                // If it's a command like {{setvar::...}}, 'setvar' is in list.
-                // If user types {{setvarrr::...}}, we want to flag 'setvarrr'.
-                
-                // Let's only flag if it looks like a function call (followed by ::)
-                if (text.substring(j, j+2) === '::') {
-                     markers.push({
-                        severity: 2, // Warning
-                        message: `Unknown command: "${keyword}"`, // Corrected escaping for template literal
-                        startLineNumber: line,
-                        startColumn: col + 2,
-                        endLineNumber: line,
-                        endColumn: col + 2 + keyword.length
-                    });
+            const afterKeywordIndex = j;
+            const isFollowedByDoubleColon = text.substring(j, j+2) === '::';
+            const isFollowedBySpace = /\s/.test(text[j]);
+            const isFollowedByClose = text[j] === '}' && text[j+1] === '}';
+
+            if (keyword && !keyword.startsWith('//')) {
+                // 1. Check for unknown commands
+                if (!validKeywords.has(keyword)) {
+                    // Flag if it looks like a command usage
+                    if (isFollowedByDoubleColon) {
+                         markers.push({
+                            severity: 2, // Warning
+                            message: `Unknown command: "${keyword}"`,
+                            startLineNumber: line,
+                            startColumn: col + 2,
+                            endLineNumber: line,
+                            endColumn: col + 2 + keyword.length
+                        });
+                    } else if (isFollowedBySpace) {
+                        // Check if it's just a variable with trailing space: {{var }}
+                        // Look ahead for }} ignoring whitespace
+                        let k = j;
+                        while (k < text.length && /\s/.test(text[k])) k++;
+                        if (!(text[k] === '}' && text[k+1] === '}')) {
+                             // It has arguments, so it's likely an intended command
+                             markers.push({
+                                severity: 2, // Warning
+                                message: `Unknown command: "${keyword}" (or invalid variable syntax)`,
+                                startLineNumber: line,
+                                startColumn: col + 2,
+                                endLineNumber: line,
+                                endColumn: col + 2 + keyword.length
+                            });
+                        }
+                    }
+                } 
+                else {
+                    // 2. Validate usage of known commands
+                    if (paramsCommands.has(keyword)) {
+                        if (!isFollowedByDoubleColon && !isFollowedByClose) {
+                             // Allow {{command}} (0 args) if supported, but typically params commands need args.
+                             // Specifically 'equal' needs args.
+                             // We'll warn if it has space arguments instead of ::
+                             if (isFollowedBySpace) {
+                                markers.push({
+                                    severity: 2,
+                                    message: `Command "${keyword}" typically requires arguments separated by '::'`,
+                                    startLineNumber: line,
+                                    startColumn: col + 2,
+                                    endLineNumber: line,
+                                    endColumn: col + 2 + keyword.length
+                                });
+                             }
+                        }
+                    } else if (spaceCommands.has(keyword)) {
+                        // Space commands usually use space.
+                        // If used with ::, it might be valid (not strictly forbidden?), but unusual.
+                        // RisuAI parser might handle it, but style-wise space is standard.
+                        // Let's not be too strict here unless we are sure.
+                    }
+                    
+                    // 3. Check for deprecated
+                    if (deprecatedKeywords.has(keyword)) {
+                        markers.push({
+                           severity: 3, // Info/Warning
+                           message: `Deprecated command: "${keyword}"`,
+                           startLineNumber: line,
+                           startColumn: col + 2,
+                           endLineNumber: line,
+                           endColumn: col + 2 + keyword.length
+                       });
+                   }
                 }
-            }
-            
-             if (deprecatedKeywords.has(keyword)) {
-                 markers.push({
-                    severity: 2, // Warning
-                    message: `Deprecated command: "${keyword}"`, // Corrected escaping for template literal
-                    startLineNumber: line,
-                    startColumn: col + 2,
-                    endLineNumber: line,
-                    endColumn: col + 2 + keyword.length
-                });
             }
 
             i++; // Skip second {
@@ -108,7 +153,7 @@ export const validateCBS = (text: string): ValidationResult[] => {
         else if (char === '}' && nextChar === '}') {
             if (stack.length === 0) {
                 markers.push({
-                    severity: 8, // Error (MarkerSeverity.Error = 8 in Monaco)
+                    severity: 8, // Error
                     message: "Unexpected closing brackets '}}'",
                     startLineNumber: line,
                     startColumn: col,
