@@ -28,7 +28,7 @@
         size = 'default',
         autocomplete = 'off',
         placeholder = '',
-        value = $bindable(),
+        value = $bindable(''),
         id = undefined,
         padding = true,
         margin = "none",
