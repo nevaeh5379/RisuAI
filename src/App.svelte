@@ -25,6 +25,8 @@
     import HypaV3Progress from './lib/Others/HypaV3Progress.svelte';
     import PluginAlertModal from './lib/Others/PluginAlertModal.svelte';
     import PopupList from './lib/UI/PopupList.svelte';
+    import StudioMain from './lib/Studio/StudioMain.svelte';
+    import { studioModeOpen } from './ts/stores.svelte';
 
   
     let didFirstSetup: boolean  = $derived(DBState.db?.didFirstSetup)
@@ -186,5 +188,8 @@
     <PluginAlertModal />
     {#if popupStore.children}
         <PopupList />
+    {/if}
+    {#if $studioModeOpen}
+        <StudioMain />
     {/if}
 </main>

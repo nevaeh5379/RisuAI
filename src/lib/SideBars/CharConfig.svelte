@@ -211,9 +211,15 @@
         }
     }
 
+    import { studioModeOpen } from "src/ts/stores.svelte";
 </script>
 
 {#if licensed !== 'private' && !$MobileGUI}
+    {#if DBState.db.studioMode && DBState.db.characters[$selectedCharID].type === 'character'}
+        <Button className="mb-2 w-full" onclick={() => { $studioModeOpen = true; }}>
+            {language.studioMode}
+        </Button>
+    {/if}
     <div class="flex mb-2" class:gap-2={iconButtonSize === 24} class:gap-1={iconButtonSize < 24}>
         <button class={$CharConfigSubMenu === 0 ? 'text-textcolor ' : 'text-textcolor2'} onclick={() => {$CharConfigSubMenu = 0}}>
             <UserIcon size={iconButtonSize} />

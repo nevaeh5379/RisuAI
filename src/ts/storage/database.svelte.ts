@@ -612,6 +612,12 @@ export function setDatabase(data:Database){
     data.ImagenImageSize ??= '1K'
     data.ImagenAspectRatio ??= '1:1'
     data.ImagenPersonGeneration ??= 'allow_all'
+    if(checkNullish(data.pluginDevelopMode)){
+        data.pluginDevelopMode = false
+    }
+    if(checkNullish(data.studioMode)){
+        data.studioMode = false
+    }
     //@ts-expect-error __TAURI_INTERNALS__ is injected by Tauri runtime, not defined in Window interface
     if(!globalThis.__NODE__ && !window.__TAURI_INTERNALS__){
         //this is intended to forcely reduce the size of the database in web
@@ -1130,6 +1136,7 @@ export interface Database{
     settingsCloseButtonSize:number
     enableBookmark?: boolean
     pluginDevelopMode?: boolean
+    studioMode?: boolean
 }
 
 interface SeparateParameters{
