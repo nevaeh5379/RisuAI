@@ -64,6 +64,13 @@ export const hypaV3ProgressStore = writable({
     subMsg: '',
 })
 export const studioModeOpen = writable(false)
+export const exportModalStore = writable({
+    open: false,
+    chatId: '',
+    startIndex: 0,
+    endIndex: 0,
+    initialIndex: 0
+})
 export const selIdState = $state({
     selId: -1
 })

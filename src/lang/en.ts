@@ -1,4 +1,13 @@
 export const languageEnglish = {
+    exportLogs: "Export Logs",
+    enableLogExport: "Enable Log Export",
+    logExportPreview: "Log Export Preview",
+    exportThisMessage: "Export This Message",
+    exportRange: "Export Range",
+    exportFromHere: "Export From Here",
+    exportSuccess: "Logs exported successfully",
+    repetitionPenalty: "Repetition Penalty",
+    verbosity: "Verbosity",
     formating: {
         main: "Main Prompt",
         jailbreak: "Jailbreak Prompt",
@@ -1464,4 +1473,5 @@ export const languageEnglish = {
     trimStartNewChat: "Trim 'Start New Chat' Messages",
     pluginDevelopMode: "Plugin Develop Mode",
     studioMode: "Studio Mode",
+    titleGeneration: "Title Generation",
 }

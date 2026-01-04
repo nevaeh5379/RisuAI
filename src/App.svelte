@@ -27,6 +27,7 @@
     import PopupList from './lib/UI/PopupList.svelte';
     import StudioMain from './lib/Studio/StudioMain.svelte';
     import { studioModeOpen } from './ts/stores.svelte';
+    import ExportModal from './lib/ChatScreens/ExportModal.svelte';
 
   
     let didFirstSetup: boolean  = $derived(DBState.db?.didFirstSetup)
@@ -192,4 +193,5 @@
     {#if $studioModeOpen}
         <StudioMain />
     {/if}
+    <ExportModal />
 </main>

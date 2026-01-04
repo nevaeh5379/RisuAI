@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { ArrowLeft, ArrowLeftRightIcon, ArrowRight, BookmarkIcon, BotIcon, CopyIcon, PowerOff, GitBranch, HamburgerIcon, LanguagesIcon, MenuIcon, PencilIcon, RefreshCcwIcon, SplitIcon, TrashIcon, UserIcon, Volume2Icon, Scissors } from "@lucide/svelte"
+    import { ArrowLeft, ArrowLeftRightIcon, ArrowRight, BookmarkIcon, BotIcon, CopyIcon, PowerOff, GitBranch, HamburgerIcon, LanguagesIcon, MenuIcon, PencilIcon, RefreshCcwIcon, SplitIcon, TrashIcon, UserIcon, Volume2Icon, Scissors, Download } from "@lucide/svelte"
     import { aiLawApplies, changeChatTo, foldChatToMessage, getFileSrc } from "src/ts/globalApi.svelte"
     import { ColorSchemeTypeStore } from "src/ts/gui/colorscheme"
     import { longpress } from "src/ts/gui/longtouch"
@@ -8,7 +8,7 @@
     import { risuChatParser } from "src/ts/process/scripts"
     import { runTrigger } from 'src/ts/process/triggers'
     import { sayTTS } from "src/ts/process/tts"
-    import { DBState, ReloadChatPointer, CurrentTriggerIdStore, popupStore } from 'src/ts/stores.svelte'
+    import { DBState, ReloadChatPointer, CurrentTriggerIdStore, popupStore, exportModalStore } from 'src/ts/stores.svelte'
     import { ConnectionOpenStore } from "src/ts/sync/multiuser"
     import { capitalize, getUserIcon, getUserName, sleep } from "src/ts/util"
     import { onDestroy, onMount } from "svelte"
@@ -671,6 +671,22 @@
 
             {#if showNames}
                 <span class="ml-1">{language.remove}</span>
+            {/if}
+        </button>
+    {/if}
+    {#if DBState.db.enableLogExport}
+        <button class="flex items-center hover:text-blue-500 transition-colors" onclick={async () => {
+             $exportModalStore = {
+                 open: true,
+                 chatId: DBState.db.characters[selIdState.selId]?.chats?.[DBState.db.characters[selIdState.selId]?.chatPage]?.id,
+                 startIndex: idx,
+                 endIndex: idx,
+                 initialIndex: idx
+             };
+        }}>
+            <Download size={20}/>
+            {#if showNames}
+                <span class="ml-1">{language.exportLogs}</span>
             {/if}
         </button>
     {/if}

@@ -99,10 +99,34 @@
         </button>
         <button onclick={() => {
             submenu = 3
-        }} class="p-2 flex-1" class:bg-darkbutton={submenu === 3}>
+        }} class="p-2 flex-1 border-r border-darkborderc" class:bg-darkbutton={submenu === 3}>
             <span>{language.imageGeneration}</span>
         </button>
+        <button onclick={() => {
+            submenu = 4
+        }} class="p-2 flex-1" class:bg-darkbutton={submenu === 4}>
+            <span>{language.titleGeneration}</span>
+        </button>
     </div>
+{/if}
+
+{#if submenu === 4 || submenu === -1}
+    <Arcodion name={language.titleGeneration} styled disabled={submenu !== -1}>
+        <span class="text-textcolor mt-2">{language.model}</span>
+        <SelectInput className="mt-2 mb-4" bind:value={DBState.db.titleGeneration.model}>
+            <OptionInput value="main">{language.triggerInputLabels.modelMain}</OptionInput>
+            <OptionInput value="sub">{language.triggerInputLabels.modelSub}</OptionInput>
+            {#each DBState.db.customModels as model}
+                <OptionInput value={model.id}>{model.name}</OptionInput>
+            {/each}
+        </SelectInput>
+
+        <span class="text-textcolor">{language.prompt}</span>
+        <TextAreaInput className="mt-2 mb-4" bind:value={DBState.db.titleGeneration.prompt} />
+
+        <span class="text-textcolor">{language.maxResponseSize}</span>
+        <NumberInput className="mt-2 mb-4" bind:value={DBState.db.titleGeneration.maxLength} min={1} />
+    </Arcodion>
 {/if}
 
 {#if submenu === 3 || submenu === -1}
