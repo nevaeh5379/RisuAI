@@ -7,21 +7,30 @@ export async function generateSessionTitle(chatIndex: number): Promise<requestDa
     const char = getCurrentCharacter();
     const chat = char.chats[chatIndex];
 
-    if (!chat || chat.message.length === 0) {
-        throw new Error("Chat is empty");
+    const messages = chat.message;
+    let contextMessages: any[] = [];
+
+    if (!chat) {
+        throw new Error("Chat is invalid");
     }
 
-    const messages = chat.message;
-    // Take the last 10 messages or so for context, or maybe more depending on the prompt
-    // For a title, usually the beginning or a summary of recent events is good.
-    // Let's take up to 20 recent messages.
-    const contextMessages = messages.slice(-20);
+    if (messages.length === 0) {
+        // Fallback to first message or description if chat is empty
+        const fallbackContent = char.firstMessage || (char.type === 'character' ? char.desc : '') || char.name;
+        if (fallbackContent) {
+            contextMessages = [{
+                role: 'char',
+                data: fallbackContent
+            }];
+        } else {
+            throw new Error("Chat is empty and no fallback content found");
+        }
+    } else {
+        contextMessages = messages.slice(-20);
+    }
 
     const formated: OpenAIChat[] = contextMessages.map(msg => ({
-        role: msg.role === 'char' ? 'model' : 'user', // Map 'char' to 'model' (or 'assistant' depending on backend, requestChatData handles some of this but let's stick to OpenAIChat type)
-        // Wait, OpenAIChat role is 'system'|'user'|'assistant'. request.ts says:
-        // export interface OpenAIChat { role: 'system'|'user'|'assistant', content: string }
-        // So I should map 'char' to 'assistant'.
+        role: msg.role === 'char' ? 'model' : 'user',
         content: msg.data
     })).map(m => {
         if (m.role === 'model') m.role = 'assistant';
@@ -30,11 +39,17 @@ export async function generateSessionTitle(chatIndex: number): Promise<requestDa
 
     const prompt = db.titleGeneration.prompt;
     let model = db.titleGeneration.model;
+    let mode: 'model' | 'submodel' = 'model';
+
+    console.log("Title Gen - Initial Setting:", model);
     if (model === 'main') {
         model = db.aiModel;
+        mode = 'model';
     } else if (model === 'sub') {
         model = db.subModel;
+        mode = 'submodel';
     }
+    console.log("Title Gen - Resolved Model ID:", model, "Mode:", mode);
     const maxLength = db.titleGeneration.maxLength;
 
     // Add the instruction as a system message or a user message at the end?
@@ -56,5 +71,5 @@ export async function generateSessionTitle(chatIndex: number): Promise<requestDa
         useStreaming: true, // We want the typewriter effect
         staticModel: model, // Use the specific model for title generation
         // We might want to disable some chat-specific processing
-    }, 'model');
+    }, mode);
 }

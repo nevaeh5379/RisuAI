@@ -634,6 +634,9 @@ export function setDatabase(data: Database) {
             enabled: true
         }
     }
+    if (checkNullish(data.titleGeneration.enabled)) {
+        data.titleGeneration.enabled = true
+    }
     changeLanguage(data.language)
     setDatabaseLite(data)
 }

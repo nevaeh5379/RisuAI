@@ -92,7 +92,8 @@
                     <span>{chat.name}</span>
                 {/if}
                 <div class="grow flex justify-end">
-                    {#if DBState.db.titleGeneration.enabled}
+                    {#if DBState.db.titleGeneration?.enabled !== false}
+                        <span class="text-red-500 text-xs">Gen</span>
                         <div
                             class="text-textcolor2 hover:text-green-500 mr-2 cursor-pointer"
                             role="button"

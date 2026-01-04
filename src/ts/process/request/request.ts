@@ -29,44 +29,44 @@ type ToolCallResponse = {
     result: RPCToolCallContent[]
 }
 
-interface requestDataArgument{
+interface requestDataArgument {
     formated: OpenAIChat[]
-    bias: {[key:number]:number}
-    biasString?: [string,number][]
+    bias: { [key: number]: number }
+    biasString?: [string, number][]
     currentChar?: character
     temperature?: number
-    maxTokens?:number
+    maxTokens?: number
     PresensePenalty?: number
     frequencyPenalty?: number,
-    useStreaming?:boolean
-    isGroupChat?:boolean
-    useEmotion?:boolean
-    continue?:boolean
-    chatId?:string
-    noMultiGen?:boolean
-    schema?:string
-    extractJson?:string
-    imageResponse?:boolean
-    previewBody?:boolean
+    useStreaming?: boolean
+    isGroupChat?: boolean
+    useEmotion?: boolean
+    continue?: boolean
+    chatId?: string
+    noMultiGen?: boolean
+    schema?: string
+    extractJson?: string
+    imageResponse?: boolean
+    previewBody?: boolean
     staticModel?: string
-    escape?:boolean
+    escape?: boolean
     tools?: MCPTool[]
     rememberToolUsage?: boolean
 }
 
-export interface RequestDataArgumentExtended extends requestDataArgument{
-    aiModel?:string
-    multiGen?:boolean
-    abortSignal?:AbortSignal
-    modelInfo?:LLMModel
-    customURL?:string
-    mode?:ModelModeExtended
-    key?:string
-    additionalOutput?:string
+export interface RequestDataArgumentExtended extends requestDataArgument {
+    aiModel?: string
+    multiGen?: boolean
+    abortSignal?: AbortSignal
+    modelInfo?: LLMModel
+    customURL?: string
+    mode?: ModelModeExtended
+    key?: string
+    additionalOutput?: string
 }
 
 export type requestDataResponse = {
-    type: 'success'|'fail'
+    type: 'success' | 'fail'
     result: string
     noRetry?: boolean,
     special?: {
@@ -74,26 +74,26 @@ export type requestDataResponse = {
     },
     failByServerError?: boolean
     model?: string
-}|{
+} | {
     type: "streaming",
     result: ReadableStream<StreamResponseChunk>,
     special?: {
         emotion?: string
     }
     model?: string
-}|{
+} | {
     type: "multiline",
-    result: ['user'|'char',string][],
+    result: ['user' | 'char', string][],
     special?: {
         emotion?: string
     }
     model?: string
 }
 
-export interface StreamResponseChunk{[key:string]:string}
+export interface StreamResponseChunk { [key: string]: string }
 
-export type Parameter = 'temperature'|'top_k'|'repetition_penalty'|'min_p'|'top_a'|'top_p'|'frequency_penalty'|'presence_penalty'|'reasoning_effort'|'thinking_tokens'|'verbosity'
-export type ModelModeExtended = 'model'|'submodel'|'memory'|'emotion'|'otherAx'|'translate'
+export type Parameter = 'temperature' | 'top_k' | 'repetition_penalty' | 'min_p' | 'top_a' | 'top_p' | 'frequency_penalty' | 'presence_penalty' | 'reasoning_effort' | 'thinking_tokens' | 'verbosity'
+export type ModelModeExtended = 'model' | 'submodel' | 'memory' | 'emotion' | 'otherAx' | 'translate'
 type ParameterMap = {
     [key in Parameter]?: string;
 };
@@ -101,9 +101,9 @@ type ParameterMap = {
 export function setObjectValue<T>(obj: T, key: string, value: any): T {
 
     const splitKey = key.split('.');
-    if(splitKey.length > 1){
+    if (splitKey.length > 1) {
         const firstKey = splitKey.shift()
-        if(!obj[firstKey]){
+        if (!obj[firstKey]) {
             obj[firstKey] = {};
         }
         obj[firstKey] = setObjectValue(obj[firstKey], splitKey.join('.'), value);
@@ -114,108 +114,108 @@ export function setObjectValue<T>(obj: T, key: string, value: any): T {
     return obj;
 }
 
-export function applyParameters(data: { [key: string]: any }, parameters: Parameter[], rename: ParameterMap, ModelMode:ModelModeExtended, arg:{
-    ignoreTopKIfZero?:boolean
+export function applyParameters(data: { [key: string]: any }, parameters: Parameter[], rename: ParameterMap, ModelMode: ModelModeExtended, arg: {
+    ignoreTopKIfZero?: boolean
 } = {}): { [key: string]: any } {
     const db = getDatabase()
 
-    function getEffort(effort:number){
-        switch(effort){
-            case -1:{
+    function getEffort(effort: number) {
+        switch (effort) {
+            case -1: {
                 return 'minimal'
             }
-            case 0:{
+            case 0: {
                 return 'low'
             }
-            case 1:{
+            case 1: {
                 return 'medium'
             }
-            case 2:{
+            case 2: {
                 return 'high'
             }
-            default:{
+            default: {
                 return 'medium'
             }
         }
     }
 
-    function getVerbosity(verbosity:number){
-        switch(verbosity){
-            case 0:{
+    function getVerbosity(verbosity: number) {
+        switch (verbosity) {
+            case 0: {
                 return 'low'
             }
-            case 1:{
+            case 1: {
                 return 'medium'
             }
-            case 2:{
+            case 2: {
                 return 'high'
             }
-            default:{
+            default: {
                 return 'medium'
             }
         }
     }
 
-    if(db.seperateParametersEnabled && ModelMode !== 'model'){
-        if(ModelMode === 'submodel'){
+    if (db.seperateParametersEnabled && ModelMode !== 'model') {
+        if (ModelMode === 'submodel') {
             ModelMode = 'otherAx'
         }
 
-        for(const parameter of parameters){
-            
-            let value:number|string = 0
-            if(parameter === 'top_k' && arg.ignoreTopKIfZero && db.seperateParameters[ModelMode][parameter] === 0){
+        for (const parameter of parameters) {
+
+            let value: number | string = 0
+            if (parameter === 'top_k' && arg.ignoreTopKIfZero && db.seperateParameters[ModelMode][parameter] === 0) {
                 continue
             }
 
-            switch(parameter){
-                case 'temperature':{
+            switch (parameter) {
+                case 'temperature': {
                     value = db.seperateParameters[ModelMode].temperature === -1000 ? -1000 : (db.seperateParameters[ModelMode].temperature / 100)
                     break
                 }
-                case 'top_k':{
+                case 'top_k': {
                     value = db.seperateParameters[ModelMode].top_k
                     break
                 }
-                case 'repetition_penalty':{
+                case 'repetition_penalty': {
                     value = db.seperateParameters[ModelMode].repetition_penalty
                     break
                 }
-                case 'min_p':{
+                case 'min_p': {
                     value = db.seperateParameters[ModelMode].min_p
                     break
                 }
-                case 'top_a':{
+                case 'top_a': {
                     value = db.seperateParameters[ModelMode].top_a
                     break
                 }
-                case 'top_p':{
+                case 'top_p': {
                     value = db.seperateParameters[ModelMode].top_p
                     break
                 }
-                case 'thinking_tokens':{
+                case 'thinking_tokens': {
                     value = db.seperateParameters[ModelMode].thinking_tokens
                     break
                 }
-                case 'frequency_penalty':{
+                case 'frequency_penalty': {
                     value = db.seperateParameters[ModelMode].frequency_penalty === -1000 ? -1000 : (db.seperateParameters[ModelMode].frequency_penalty / 100)
                     break
                 }
-                case 'presence_penalty':{
+                case 'presence_penalty': {
                     value = db.seperateParameters[ModelMode].presence_penalty === -1000 ? -1000 : (db.seperateParameters[ModelMode].presence_penalty / 100)
                     break
                 }
-                case 'reasoning_effort':{
+                case 'reasoning_effort': {
                     value = getEffort(db.seperateParameters[ModelMode].reasoning_effort)
                     break
                 }
-                case 'verbosity':{
+                case 'verbosity': {
                     value = getVerbosity(db.seperateParameters[ModelMode].verbosity)
                     break
                 }
             }
 
-            if(value === -1000 || value === undefined){
+            if (value === -1000 || value === undefined) {
                 continue
             }
 
@@ -225,59 +225,59 @@ export function applyParameters(data: { [key: string]: any }, parameters: Parame
     }
 
 
-    for(const parameter of parameters){
-        let value:number|string = 0
-        if(parameter === 'top_k' && arg.ignoreTopKIfZero && db.top_k === 0){
+    for (const parameter of parameters) {
+        let value: number | string = 0
+        if (parameter === 'top_k' && arg.ignoreTopKIfZero && db.top_k === 0) {
             continue
         }
-        switch(parameter){
-            case 'temperature':{
+        switch (parameter) {
+            case 'temperature': {
                 value = db.temperature === -1000 ? -1000 : (db.temperature / 100)
                 break
             }
-            case 'top_k':{
+            case 'top_k': {
                 value = db.top_k
                 break
             }
-            case 'repetition_penalty':{
+            case 'repetition_penalty': {
                 value = db.repetition_penalty
                 break
             }
-            case 'min_p':{
+            case 'min_p': {
                 value = db.min_p
                 break
             }
-            case 'top_a':{
+            case 'top_a': {
                 value = db.top_a
                 break
             }
-            case 'top_p':{
+            case 'top_p': {
                 value = db.top_p
                 break
             }
-            case 'reasoning_effort':{
+            case 'reasoning_effort': {
                 value = getEffort(db.reasoningEffort)
                 break
             }
-            case 'verbosity':{
+            case 'verbosity': {
                 value = getVerbosity(db.verbosity)
                 break
             }
-            case 'frequency_penalty':{
+            case 'frequency_penalty': {
                 value = db.frequencyPenalty === -1000 ? -1000 : (db.frequencyPenalty / 100)
                 break
             }
-            case 'presence_penalty':{
+            case 'presence_penalty': {
                 value = db.PresensePenalty === -1000 ? -1000 : (db.PresensePenalty / 100)
                 break
             }
-            case 'thinking_tokens':{
+            case 'thinking_tokens': {
                 value = db.thinkingTokens
                 break
             }
         }
 
-        if(value === -1000){
+        if (value === -1000) {
             continue
         }
 
@@ -286,14 +286,14 @@ export function applyParameters(data: { [key: string]: any }, parameters: Parame
     return data
 }
 
-export async function requestChatData(arg:requestDataArgument, model:ModelModeExtended, abortSignal:AbortSignal=null):Promise<requestDataResponse> {
+export async function requestChatData(arg: requestDataArgument, model: ModelModeExtended, abortSignal: AbortSignal = null): Promise<requestDataResponse> {
     const db = getDatabase()
-    const fallBackModels:string[] = safeStructuredClone(db?.fallbackModels?.[model] ?? [])
+    const fallBackModels: string[] = safeStructuredClone(db?.fallbackModels?.[model] ?? [])
     const tools = await getTools()
     fallBackModels.push('')
-    let da:requestDataResponse
+    let da: requestDataResponse
 
-    if(arg.escape){
+    if (arg.escape) {
         arg.useStreaming = false
         console.warn('Escape is enabled, disabling streaming')
     }
@@ -303,121 +303,121 @@ export async function requestChatData(arg:requestDataArgument, model:ModelModeEx
         return m
     })
 
-    for(let fallbackIndex=0;fallbackIndex<fallBackModels.length;fallbackIndex++){
+    for (let fallbackIndex = 0; fallbackIndex < fallBackModels.length; fallbackIndex++) {
         let trys = 0
         arg.formated = safeStructuredClone(originalFormated)
 
-        if(fallbackIndex !== 0 && !fallBackModels[fallbackIndex]){
+        if (fallbackIndex !== 0 && !fallBackModels[fallbackIndex]) {
             continue
         }
 
-        while(true){
-            
-            if(abortSignal?.aborted){
+        while (true) {
+
+            if (abortSignal?.aborted) {
                 return {
                     type: 'fail',
                     result: 'Aborted'
                 }
             }
-    
-            if(pluginV2.replacerbeforeRequest.size > 0){
-                for(const replacer of pluginV2.replacerbeforeRequest){
+
+            if (pluginV2.replacerbeforeRequest.size > 0) {
+                for (const replacer of pluginV2.replacerbeforeRequest) {
                     arg.formated = await replacer(arg.formated, model)
                 }
             }
-            
-            try{
+
+            try {
                 const currentChar = getCurrentCharacter()
-                if(currentChar?.type !== 'group'){
+                if (currentChar?.type !== 'group') {
                     const perf = performance.now()
                     const d = await runTrigger(currentChar, 'request', {
                         chat: getCurrentChat(),
                         displayMode: true,
                         displayData: JSON.stringify(arg.formated)
                     })
-        
+
                     const got = JSON.parse(d.displayData)
-                    if(!got || !Array.isArray(got)){
+                    if (!got || !Array.isArray(got)) {
                         throw new Error('Invalid return')
                     }
                     arg.formated = got
                     console.log('Trigger time', performance.now() - perf)
                 }
             }
-            catch(e){
+            catch (e) {
                 console.error(e)
             }
-            
-    
+
+
             da = await requestChatDataMain({
                 ...arg,
                 staticModel: fallBackModels[fallbackIndex],
                 tools: tools,
             }, model, abortSignal)
 
-            if(abortSignal?.aborted){
+            if (abortSignal?.aborted) {
                 return {
                     type: 'fail',
                     result: 'Aborted'
                 }
             }
 
-            if(da.type === 'success' && arg.escape){
+            if (da.type === 'success' && arg.escape) {
                 da.result = risuEscape(da.result)
             }
-    
-            if(da.type === 'success' && pluginV2.replacerafterRequest.size > 0){
-                for(const replacer of pluginV2.replacerafterRequest){
+
+            if (da.type === 'success' && pluginV2.replacerafterRequest.size > 0) {
+                for (const replacer of pluginV2.replacerafterRequest) {
                     da.result = await replacer(da.result, model)
                 }
             }
-    
-            if(da.type === 'success' && db.banCharacterset?.length > 0){
+
+            if (da.type === 'success' && db.banCharacterset?.length > 0) {
                 let failed = false
-                for(const set of db.banCharacterset){
+                for (const set of db.banCharacterset) {
                     console.log(set)
                     const checkRegex = new RegExp(`\\p{Script=${set}}`, 'gu')
-    
-                    if(checkRegex.test(da.result)){
+
+                    if (checkRegex.test(da.result)) {
                         trys += 1
                         failed = true
                         break
                     }
                 }
-    
-                if(failed){
+
+                if (failed) {
                     continue
                 }
             }
-    
-            if(da.type === 'success' && fallbackIndex !== fallBackModels.length-1 && db.fallbackWhenBlankResponse){
-                if(da.result.trim() === ''){
+
+            if (da.type === 'success' && fallbackIndex !== fallBackModels.length - 1 && db.fallbackWhenBlankResponse) {
+                if (da.result.trim() === '') {
                     break
                 }
             }
-    
-            if(da.type !== 'fail' || da.noRetry){
+
+            if (da.type !== 'fail' || da.noRetry) {
                 return {
                     ...da,
                     model: fallBackModels[fallbackIndex]
                 }
             }
-    
-            if(da.failByServerError){
+
+            if (da.failByServerError) {
                 await sleep(1000)
-                if(db.antiServerOverloads){
+                if (db.antiServerOverloads) {
                     trys -= 0.5 // reduce trys by 0.5, so that it will retry twice as much
                 }
             }
-            
+
             trys += 1
-            if(trys > db.requestRetrys){
-                if(fallbackIndex === fallBackModels.length-1 || da.model === 'custom'){
+            if (trys > db.requestRetrys) {
+                if (fallbackIndex === fallBackModels.length - 1 || da.model === 'custom') {
                     return da
                 }
                 break
             }
-        }   
+        }
     }
 
 
@@ -433,36 +433,36 @@ export interface OpenAITextContents {
 }
 
 export interface OpenAIImageContents {
-    type: 'image'|'image_url'
+    type: 'image' | 'image_url'
     image_url: {
         url: string
         detail: string
     }
 }
 
-export type OpenAIContents = OpenAITextContents|OpenAIImageContents
+export type OpenAIContents = OpenAITextContents | OpenAIImageContents
 
 export interface OpenAIToolCall {
-    id:string,
-    type:'function',
-    function:{
-        name:string,
-        arguments:string
+    id: string,
+    type: 'function',
+    function: {
+        name: string,
+        arguments: string
     },
 }
 
 export interface OpenAIChatExtra {
-    role: 'system'|'user'|'assistant'|'function'|'developer'|'tool'
-    content: string|OpenAIContents[]
-    memo?:string
-    name?:string
-    removable?:boolean
-    attr?:string[]
-    multimodals?:MultiModal[]
-    thoughts?:string[]
-    prefix?:boolean
-    reasoning_content?:string
-    cachePoint?:boolean
+    role: 'system' | 'user' | 'assistant' | 'function' | 'developer' | 'tool'
+    content: string | OpenAIContents[]
+    memo?: string
+    name?: string
+    removable?: boolean
+    attr?: string[]
+    multimodals?: MultiModal[]
+    thoughts?: string[]
+    prefix?: boolean
+    reasoning_content?: string
+    cachePoint?: boolean
     function?: {
         name: string
         description?: string
@@ -473,78 +473,78 @@ export interface OpenAIChatExtra {
     tool_calls?: OpenAIToolCall[]
 }
 
-export function reformater(formated:OpenAIChat[],modelInfo:LLMModel|LLMFlags[]){
+export function reformater(formated: OpenAIChat[], modelInfo: LLMModel | LLMFlags[]) {
 
     const flags = Array.isArray(modelInfo) ? modelInfo : modelInfo.flags
-    
-    const db = getDatabase()
-    let systemPrompt:OpenAIChat|null = null
 
-    if(!flags.includes(LLMFlags.hasFullSystemPrompt)){
-        if(flags.includes(LLMFlags.hasFirstSystemPrompt)){
-            while(formated[0].role === 'system'){
-                if(systemPrompt){
+    const db = getDatabase()
+    let systemPrompt: OpenAIChat | null = null
+
+    if (!flags.includes(LLMFlags.hasFullSystemPrompt)) {
+        if (flags.includes(LLMFlags.hasFirstSystemPrompt)) {
+            while (formated[0].role === 'system') {
+                if (systemPrompt) {
                     systemPrompt.content += '\n\n' + formated[0].content
                 }
-                else{
+                else {
                     systemPrompt = formated[0]
                 }
                 formated = formated.slice(1)
             }
         }
 
-        for(let i=0;i<formated.length;i++){
-            if(formated[i].role === 'system'){
+        for (let i = 0; i < formated.length; i++) {
+            if (formated[i].role === 'system') {
                 formated[i].content = db.systemContentReplacement ? db.systemContentReplacement.replace('{{slot}}', formated[i].content) : `system: ${formated[i].content}`
                 formated[i].role = db.systemRoleReplacement
             }
         }
     }
-    
-    if(flags.includes(LLMFlags.requiresAlternateRole)){
-        let newFormated:OpenAIChat[] = []
-        for(let i=0;i<formated.length;i++){
+
+    if (flags.includes(LLMFlags.requiresAlternateRole)) {
+        let newFormated: OpenAIChat[] = []
+        for (let i = 0; i < formated.length; i++) {
             const m = formated[i]
-            if(newFormated.length === 0){
+            if (newFormated.length === 0) {
                 newFormated.push(m)
                 continue
             }
 
-            if(newFormated[newFormated.length-1].role === m.role){
-            
-                newFormated[newFormated.length-1].content += '\n' + m.content
+            if (newFormated[newFormated.length - 1].role === m.role) {
 
-                if(m.multimodals){
-                    if(!newFormated[newFormated.length-1].multimodals){
-                        newFormated[newFormated.length-1].multimodals = []
+                newFormated[newFormated.length - 1].content += '\n' + m.content
+
+                if (m.multimodals) {
+                    if (!newFormated[newFormated.length - 1].multimodals) {
+                        newFormated[newFormated.length - 1].multimodals = []
                     }
-                    newFormated[newFormated.length-1].multimodals.push(...m.multimodals)
+                    newFormated[newFormated.length - 1].multimodals.push(...m.multimodals)
                 }
 
-                if(m.thoughts){
-                    if(!newFormated[newFormated.length-1].thoughts){
-                        newFormated[newFormated.length-1].thoughts = []
+                if (m.thoughts) {
+                    if (!newFormated[newFormated.length - 1].thoughts) {
+                        newFormated[newFormated.length - 1].thoughts = []
                     }
-                    newFormated[newFormated.length-1].thoughts.push(...m.thoughts)
+                    newFormated[newFormated.length - 1].thoughts.push(...m.thoughts)
                 }
 
-                if(m.cachePoint){
-                    if(!newFormated[newFormated.length-1].cachePoint){
-                        newFormated[newFormated.length-1].cachePoint = true
+                if (m.cachePoint) {
+                    if (!newFormated[newFormated.length - 1].cachePoint) {
+                        newFormated[newFormated.length - 1].cachePoint = true
                     }
                 }
 
                 continue
             }
-            else{
+            else {
                 newFormated.push(m)
             }
         }
         formated = newFormated
     }
 
-    if(flags.includes(LLMFlags.mustStartWithUserInput)){
-        if(formated.length === 0 || formated[0].role !== 'user'){
+    if (flags.includes(LLMFlags.mustStartWithUserInput)) {
+        if (formated.length === 0 || formated[0].role !== 'user') {
             formated.unshift({
                 role: 'user',
                 content: ' '
@@ -552,7 +552,7 @@ export function reformater(formated:OpenAIChat[],modelInfo:LLMModel|LLMFlags[]){
         }
     }
 
-    if(systemPrompt){
+    if (systemPrompt) {
         formated.unshift(systemPrompt)
     }
 
@@ -560,11 +560,11 @@ export function reformater(formated:OpenAIChat[],modelInfo:LLMModel|LLMFlags[]){
 }
 
 
-export async function requestChatDataMain(arg:requestDataArgument, model:ModelModeExtended, abortSignal:AbortSignal=null):Promise<requestDataResponse> {
+export async function requestChatDataMain(arg: requestDataArgument, model: ModelModeExtended, abortSignal: AbortSignal = null): Promise<requestDataResponse> {
     const db = getDatabase()
-    const targ:RequestDataArgumentExtended = arg
+    const targ: RequestDataArgumentExtended = arg
     targ.formated = safeStructuredClone(arg.formated)
-    targ.maxTokens = arg.maxTokens ??db.maxResponse
+    targ.maxTokens = arg.maxTokens ?? db.maxResponse
     targ.temperature = arg.temperature ?? (db.temperature / 100)
     targ.bias = arg.bias
     targ.currentChar = arg.currentChar
@@ -577,20 +577,20 @@ export async function requestChatDataMain(arg:requestDataArgument, model:ModelMo
     targ.modelInfo = getModelInfo(targ.aiModel)
     targ.mode = model
     targ.extractJson = arg.extractJson ?? db.extractJson
-    if(targ.aiModel === 'reverse_proxy'){
+    if (targ.aiModel === 'reverse_proxy') {
         targ.modelInfo.internalID = db.customProxyRequestModel
         targ.modelInfo.format = db.customAPIFormat
         targ.customURL = db.forceReplaceUrl
         targ.key = db.proxyKey
     }
-    if(targ.aiModel.startsWith('xcustom:::')){
+    if (targ.aiModel.startsWith('xcustom:::')) {
         const found = db.customModels.find(m => m.id === targ.aiModel)
         targ.customURL = found?.url
         targ.key = found?.key
     }
 
-    if(db.seperateModelsForAxModels && !arg.staticModel){
-        if(db.seperateModels[model]){
+    if (db.seperateModelsForAxModels && !arg.staticModel) {
+        if (db.seperateModels[model]) {
             targ.aiModel = db.seperateModels[model]
             targ.modelInfo = getModelInfo(targ.aiModel)
         }
@@ -600,7 +600,7 @@ export async function requestChatDataMain(arg:requestDataArgument, model:ModelMo
 
     targ.formated = reformater(targ.formated, targ.modelInfo)
 
-    switch(format){
+    switch (format) {
         case LLMFormat.OpenAICompatible:
         case LLMFormat.Mistral:
             return requestOpenAI(targ)
@@ -646,7 +646,7 @@ export async function requestChatDataMain(arg:requestDataArgument, model:ModelMo
 
 
 
-async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDataResponse>{
+async function requestNovelAI(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
@@ -656,11 +656,11 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
     const currentChar = getCurrentCharacter()
     const prompt = stringlizeNAIChat(formated, currentChar?.name ?? '', arg.continue)
     const abortSignal = arg.abortSignal
-    let logit_bias_exp:{
+    let logit_bias_exp: {
         sequence: number[], bias: number, ensure_sequence_finish: false, generate_once: true
     }[] = []
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
@@ -669,13 +669,13 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
         }
     }
 
-    for(let i=0;i<biasString.length;i++){
+    for (let i = 0; i < biasString.length; i++) {
         const bia = biasString[i]
         const tokens = await tokenizeNum(bia[0])
 
-        const tokensInNumberArray:number[] = []
+        const tokensInNumberArray: number[] = []
 
-        for(const token of tokens){
+        for (const token of tokens) {
             tokensInNumberArray.push(token)
         }
         logit_bias_exp.push({
@@ -688,13 +688,13 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
 
     let prefix = 'vanilla'
 
-    if(db.NAIadventure){
+    if (db.NAIadventure) {
         prefix = 'theme_textadventure'
     }
 
     const gen = db.NAIsettings
     const payload = {
-        temperature:temperature,
+        temperature: temperature,
         max_length: maxTokens,
         min_length: 1,
         top_k: gen.topK,
@@ -713,23 +713,23 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
         prefix: prefix,
         order: [6, 2, 3, 0, 4, 1, 5, 8],
         typical_p: gen.typicalp,
-        repetition_penalty_whitelist:[49256,49264,49231,49230,49287,85,49255,49399,49262,336,333,432,363,468,492,745,401,426,623,794,1096,2919,2072,7379,1259,2110,620,526,487,16562,603,805,761,2681,942,8917,653,3513,506,5301,562,5010,614,10942,539,2976,462,5189,567,2032,123,124,125,126,127,128,129,130,131,132,588,803,1040,49209,4,5,6,7,8,9,10,11,12],
+        repetition_penalty_whitelist: [49256, 49264, 49231, 49230, 49287, 85, 49255, 49399, 49262, 336, 333, 432, 363, 468, 492, 745, 401, 426, 623, 794, 1096, 2919, 2072, 7379, 1259, 2110, 620, 526, 487, 16562, 603, 805, 761, 2681, 942, 8917, 653, 3513, 506, 5301, 562, 5010, 614, 10942, 539, 2976, 462, 5189, 567, 2032, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 588, 803, 1040, 49209, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         stop_sequences: [[49287], [49405]],
         bad_words_ids: NovelAIBadWordIds,
         logit_bias_exp: logit_bias_exp,
         mirostat_lr: gen.mirostat_lr ?? 1,
         mirostat_tau: gen.mirostat_tau ?? 0,
         cfg_scale: gen.cfg_scale ?? 1,
-        cfg_uc: ""   
+        cfg_uc: ""
     }
 
-    
 
-      
+
+
     const body = {
         "input": prompt,
         "model": aiModel === 'novelai_kayra' ? 'kayra-v1' : 'clio-v1',
-        "parameters":payload
+        "parameters": payload
     }
 
     const da = await globalFetch(aiModel === 'novelai_kayra' ? "https://text.novelai.net/ai/generate" : "https://api.novelai.net/ai/generate", {
@@ -741,7 +741,7 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
         chatId: arg.chatId,
     })
 
-    if((!da.ok )|| (!da.data.output)){
+    if ((!da.ok) || (!da.data.output)) {
         return {
             type: 'fail',
             result: (language.errors.httpError + `${JSON.stringify(da.data)}`)
@@ -753,7 +753,7 @@ async function requestNovelAI(arg:RequestDataArgumentExtended):Promise<requestDa
     }
 }
 
-async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestOobaLegacy(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
@@ -763,10 +763,10 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
     const abortSignal = arg.abortSignal
     let streamUrl = db.textgenWebUIStreamURL.replace(/\/api.*/, "/api/v1/stream")
     let blockingUrl = db.textgenWebUIBlockingURL.replace(/\/api.*/, "/api/v1/generate")
-    let bodyTemplate:{[key:string]:any} = {}
+    let bodyTemplate: { [key: string]: any } = {}
     const prompt = applyChatTemplate(formated)
     let stopStrings = getStopStrings(false)
-    if(db.localStopStrings){
+    if (db.localStopStrings) {
         stopStrings = db.localStopStrings.map((v) => {
             return risuChatParser(v.replace(/\\n/g, "\n"))
         })
@@ -800,25 +800,25 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
         'X-API-KEY': db.mancerHeader
     }
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
                 url: blockingUrl,
                 body: bodyTemplate,
                 headers: headers
-            })      
+            })
         }
     }
 
-    if(useStreaming){
+    if (useStreaming) {
         const oobaboogaSocket = new WebSocket(streamUrl);
         const statusCode = await new Promise((resolve) => {
             oobaboogaSocket.onopen = () => resolve(0)
             oobaboogaSocket.onerror = () => resolve(1001)
             oobaboogaSocket.onclose = ({ code }) => resolve(code)
         })
-        if(abortSignal?.aborted || statusCode !== 0) {
+        if (abortSignal?.aborted || statusCode !== 0) {
             oobaboogaSocket.close()
             return ({
                 type: "fail",
@@ -830,7 +830,7 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
             oobaboogaSocket.close()
         }
         const stream = new ReadableStream({
-            start(controller){
+            start(controller) {
                 let readed = "";
                 oobaboogaSocket.onmessage = async (event) => {
                     const json = JSON.parse(event.data);
@@ -845,7 +845,7 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
                 };
                 oobaboogaSocket.send(JSON.stringify(bodyTemplate));
             },
-            cancel(){
+            cancel() {
                 close()
             }
         })
@@ -865,24 +865,24 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
         abortSignal,
         chatId: arg.chatId
     })
-    
+
     const dat = res.data as any
-    if(res.ok){
+    if (res.ok) {
         try {
-            let result:string = dat.results[0].text
+            let result: string = dat.results[0].text
 
             return {
                 type: 'success',
                 result: unstringlizeChat(result, formated, currentChar?.name ?? '')
             }
-        } catch (error) {                    
+        } catch (error) {
             return {
                 type: 'fail',
                 result: (language.errors.httpError + `${error}`)
             }
         }
     }
-    else{
+    else {
         return {
             type: 'fail',
             result: (language.errors.httpError + `${JSON.stringify(res.data)}`)
@@ -890,7 +890,7 @@ async function requestOobaLegacy(arg:RequestDataArgumentExtended):Promise<reques
     }
 }
 
-async function requestOoba(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestOoba(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
@@ -898,12 +898,12 @@ async function requestOoba(arg:RequestDataArgumentExtended):Promise<requestDataR
     const temperature = arg.temperature
     const prompt = applyChatTemplate(formated)
     let stopStrings = getStopStrings(false)
-    if(db.localStopStrings){
+    if (db.localStopStrings) {
         stopStrings = db.localStopStrings.map((v) => {
             return risuChatParser(v.replace(/\\n/g, "\n"))
         })
     }
-    let bodyTemplate:Record<string, any> = {
+    let bodyTemplate: Record<string, any> = {
         'prompt': prompt,
         presence_penalty: arg.PresensePenalty || (db.PresensePenalty / 100),
         frequency_penalty: arg.frequencyPenalty || (db.frequencyPenalty / 100),
@@ -920,23 +920,23 @@ async function requestOoba(arg:RequestDataArgumentExtended):Promise<requestDataR
 
     const OobaBodyTemplate = db.reverseProxyOobaArgs
     const keys = Object.keys(OobaBodyTemplate)
-    for(const key of keys){
-        if(OobaBodyTemplate[key] !== undefined && OobaBodyTemplate[key] !== null && OobaParams.includes(key)){
+    for (const key of keys) {
+        if (OobaBodyTemplate[key] !== undefined && OobaBodyTemplate[key] !== null && OobaParams.includes(key)) {
             bodyTemplate[key] = OobaBodyTemplate[key]
         }
-        else if(bodyTemplate[key]){
+        else if (bodyTemplate[key]) {
             delete bodyTemplate[key]
         }
     }
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
                 url: urlStr,
                 body: bodyTemplate,
                 headers: {}
-            })      
+            })
         }
     }
 
@@ -946,21 +946,21 @@ async function requestOoba(arg:RequestDataArgumentExtended):Promise<requestDataR
         abortSignal: arg.abortSignal
     })
 
-    if(!response.ok){
+    if (!response.ok) {
         return {
             type: 'fail',
             result: (language.errors.httpError + `${JSON.stringify(response.data)}`)
         }
     }
-    const text:string = response.data.choices[0].text
+    const text: string = response.data.choices[0].text
     return {
         type: 'success',
         result: text.replace(/##\n/g, '')
     }
-    
+
 }
 
-async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestPlugin(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const db = getDatabase()
     try {
         const formated = arg.formated
@@ -968,7 +968,7 @@ async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDat
         const bias = arg.biasString
         const v2Function = pluginV2.providers.get(db.currentPluginProvider)
 
-        if(arg.previewBody){
+        if (arg.previewBody) {
             return {
                 type: 'success',
                 result: JSON.stringify({
@@ -976,14 +976,14 @@ async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDat
                 })
             }
         }
-    
+
         const d = v2Function ? (await v2Function(applyParameters({
             prompt_chat: formated,
             mode: arg.mode,
             bias: [],
             max_tokens: maxTokens,
         }, [
-            'frequency_penalty','min_p','presence_penalty','repetition_penalty','top_k','top_p','temperature'
+            'frequency_penalty', 'min_p', 'presence_penalty', 'repetition_penalty', 'top_k', 'top_p', 'temperature'
         ], {}, arg.mode) as any, arg.abortSignal)) : await pluginProcess({
             bias: bias,
             prompt_chat: formated,
@@ -992,25 +992,25 @@ async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDat
             presence_penalty: (db.PresensePenalty / 100),
             frequency_penalty: (db.frequencyPenalty / 100)
         })
-    
-        if(!d){
+
+        if (!d) {
             return {
                 type: 'fail',
                 result: (language.errors.unknownModel),
                 model: 'custom'
             }
         }
-        else if(!d.success){
+        else if (!d.success) {
             return {
                 type: 'fail',
                 result: d.content instanceof ReadableStream ? await (new Response(d.content)).text() : d.content,
                 model: 'custom'
             }
         }
-        else if(d.content instanceof ReadableStream){
-    
+        else if (d.content instanceof ReadableStream) {
+
             let fullText = ''
-            const piper = new TransformStream<string, StreamResponseChunk>(  {
+            const piper = new TransformStream<string, StreamResponseChunk>({
                 transform(chunk, control) {
                     fullText += chunk
                     control.enqueue({
@@ -1018,20 +1018,20 @@ async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDat
                     })
                 }
             })
-    
+
             return {
                 type: 'streaming',
                 result: d.content.pipeThrough(piper),
                 model: 'custom'
             }
         }
-        else{
+        else {
             return {
                 type: 'success',
                 result: d.content,
                 model: 'custom'
             }
-        }   
+        }
     } catch (error) {
         console.error(error)
         return {
@@ -1042,7 +1042,7 @@ async function requestPlugin(arg:RequestDataArgumentExtended):Promise<requestDat
     }
 }
 
-async function requestKobold(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestKobold(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const maxTokens = arg.maxTokens
@@ -1050,7 +1050,7 @@ async function requestKobold(arg:RequestDataArgumentExtended):Promise<requestDat
 
     const prompt = applyChatTemplate(formated)
     const url = new URL(db.koboldURL)
-    if(url.pathname.length < 3){
+    if (url.pathname.length < 3) {
         url.pathname = 'api/v1/generate'
     }
 
@@ -1069,17 +1069,17 @@ async function requestKobold(arg:RequestDataArgumentExtended):Promise<requestDat
         'repetition_penalty': 'rep_pen'
     }, arg.mode) as KoboldGenerationInputSchema
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
                 url: url.toString(),
                 body: body,
                 headers: {}
-            })      
+            })
         }
     }
-    
+
     const da = await globalFetch(url.toString(), {
         method: "POST",
         body: body,
@@ -1090,7 +1090,7 @@ async function requestKobold(arg:RequestDataArgumentExtended):Promise<requestDat
         chatId: arg.chatId
     })
 
-    if(!da.ok){
+    if (!da.ok) {
         return {
             type: "fail",
             result: da.data,
@@ -1105,7 +1105,7 @@ async function requestKobold(arg:RequestDataArgumentExtended):Promise<requestDat
     }
 }
 
-async function requestNovelList(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestNovelList(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
 
     const formated = arg.formated
     const db = getDatabase()
@@ -1116,9 +1116,9 @@ async function requestNovelList(arg:RequestDataArgumentExtended):Promise<request
     const aiModel = arg.aiModel
     const auth_key = db.novellistAPI;
     const api_server_url = 'https://api.tringpt.com/';
-    const logit_bias:string[] = []
-    const logit_bias_values:string[] = []
-    for(let i=0;i<biasString.length;i++){
+    const logit_bias: string[] = []
+    const logit_bias_values: string[] = []
+    for (let i = 0; i < biasString.length; i++) {
         const bia = biasString[i]
         logit_bias.push(bia[0])
         logit_bias_values.push(bia[1].toString())
@@ -1127,7 +1127,7 @@ async function requestNovelList(arg:RequestDataArgumentExtended):Promise<request
         'Authorization': `Bearer ${auth_key}`,
         'Content-Type': 'application/json'
     };
-    
+
     const send_body = {
         text: stringlizeAINChat(formated, currentChar?.name ?? '', arg.continue),
         length: maxTokens,
@@ -1147,14 +1147,14 @@ async function requestNovelList(arg:RequestDataArgumentExtended):Promise<request
     };
 
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
                 url: api_server_url + '/api',
                 body: send_body,
                 headers: headers
-            })      
+            })
         }
     }
     const response = await globalFetch(arg.customURL ?? api_server_url + '/api', {
@@ -1165,14 +1165,14 @@ async function requestNovelList(arg:RequestDataArgumentExtended):Promise<request
         abortSignal: arg.abortSignal
     });
 
-    if(!response.ok){
+    if (!response.ok) {
         return {
             type: 'fail',
             result: response.data
         }
     }
 
-    if(response.data.error){
+    if (response.data.error) {
         return {
             'type': 'fail',
             'result': `${response.data.error.replace("token", "api key")}`
@@ -1187,11 +1187,11 @@ async function requestNovelList(arg:RequestDataArgumentExtended):Promise<request
     }
 }
 
-async function requestOllama(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestOllama(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
@@ -1200,7 +1200,7 @@ async function requestOllama(arg:RequestDataArgumentExtended):Promise<requestDat
         }
     }
 
-    const ollama = new Ollama({host: db.ollamaURL})
+    const ollama = new Ollama({ host: db.ollamaURL })
 
     const response = await ollama.chat({
         model: db.ollamaModel,
@@ -1216,8 +1216,8 @@ async function requestOllama(arg:RequestDataArgumentExtended):Promise<requestDat
     })
 
     const readableStream = new ReadableStream<StreamResponseChunk>({
-        async start(controller){
-            for await(const chunk of response){
+        async start(controller) {
+            for await (const chunk of response) {
                 controller.enqueue({
                     "0": chunk.message.content
                 })
@@ -1232,7 +1232,7 @@ async function requestOllama(arg:RequestDataArgumentExtended):Promise<requestDat
     }
 }
 
-async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestCohere(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
@@ -1240,15 +1240,15 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
     let lastChatPrompt = ''
     let preamble = ''
 
-    let lastChat = formated[formated.length-1]
-    if(lastChat.role === 'user'){
+    let lastChat = formated[formated.length - 1]
+    if (lastChat.role === 'user') {
         lastChatPrompt = lastChat.content
         formated.pop()
     }
-    else{
-        while(lastChat.role !== 'user'){
+    else {
+        while (lastChat.role !== 'user') {
             lastChat = formated.pop()
-            if(!lastChat){
+            if (!lastChat) {
                 return {
                     type: 'fail',
                     result: 'Cohere requires a user message to generate a response'
@@ -1259,7 +1259,7 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
     }
 
     const firstChat = formated[0]
-    if(firstChat.role === 'system'){
+    if (firstChat.role === 'system') {
         preamble = firstChat.content
         formated.shift()
     }
@@ -1269,19 +1269,19 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
     let body = applyParameters({
         message: lastChatPrompt,
         chat_history: formated.map((v) => {
-            if(v.role === 'assistant'){
+            if (v.role === 'assistant') {
                 return {
                     role: 'CHATBOT',
                     message: v.content
                 }
             }
-            if(v.role === 'system'){
+            if (v.role === 'system') {
                 return {
                     role: 'SYSTEM',
                     message: v.content
                 }
             }
-            if(v.role === 'user'){
+            if (v.role === 'user') {
                 return {
                     role: 'USER',
                     message: v.content
@@ -1298,22 +1298,22 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
         'top_p': 'p',
     }, arg.mode)
 
-    if(aiModel !== 'cohere-command-r-03-2024' && aiModel !== 'cohere-command-r-plus-04-2024'){
+    if (aiModel !== 'cohere-command-r-03-2024' && aiModel !== 'cohere-command-r-plus-04-2024') {
         body.safety_mode = "NONE"
     }
-    
-    if(preamble){
-        if(body.chat_history.length > 0){
+
+    if (preamble) {
+        if (body.chat_history.length > 0) {
             body.preamble = preamble
         }
-        else{
+        else {
             body.message = `system: ${preamble}`
         }
     }
 
     console.log(body)
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
@@ -1337,7 +1337,7 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
         abortSignal: arg.abortSignal
     })
 
-    if(!res.ok){
+    if (!res.ok) {
         return {
             type: 'fail',
             result: JSON.stringify(res.data)
@@ -1345,7 +1345,7 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
     }
 
     const result = res?.data?.text
-    if(!result){
+    if (!result) {
         return {
             type: 'fail',
             result: JSON.stringify(res.data)
@@ -1356,18 +1356,18 @@ async function requestCohere(arg:RequestDataArgumentExtended):Promise<requestDat
         type: 'success',
         result: result
     }
- 
+
 }
 
 
-async function requestHorde(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestHorde(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
     const currentChar = getCurrentCharacter()
     const abortSignal = arg.abortSignal
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
@@ -1398,12 +1398,12 @@ async function requestHorde(arg:RequestDataArgumentExtended):Promise<requestData
         "models": [realModel, realModel.trim(), ' ' + realModel, realModel + ' ']
     }
 
-    if(realModel === 'auto'){
+    if (realModel === 'auto') {
         delete argument.models
     }
 
     let apiKey = '0000000000'
-    if(db.hordeConfig.apiKey.length > 2){
+    if (db.hordeConfig.apiKey.length > 2) {
         apiKey = db.hordeConfig.apiKey
     }
 
@@ -1417,28 +1417,28 @@ async function requestHorde(arg:RequestDataArgumentExtended):Promise<requestData
         signal: abortSignal
     })
 
-    if(da.status !== 202){
+    if (da.status !== 202) {
         return {
             type: "fail",
             result: await da.text()
         }
     }
 
-    const json:{
-        id:string,
-        kudos:number,
-        message:string
+    const json: {
+        id: string,
+        kudos: number,
+        message: string
     } = await da.json()
 
     let warnMessage = ""
-    if(json.message){
+    if (json.message) {
         warnMessage = "with " + json.message
     }
 
-    while(true){
+    while (true) {
         await sleep(2000)
         const data = await (await fetch("https://stablehorde.net/api/v2/generate/text/status/" + json.id)).json()
-        if(!data.is_possible){
+        if (!data.is_possible) {
             fetch("https://stablehorde.net/api/v2/generate/text/status/" + json.id, {
                 method: "DELETE"
             })
@@ -1448,9 +1448,9 @@ async function requestHorde(arg:RequestDataArgumentExtended):Promise<requestData
                 noRetry: true
             }
         }
-        if(data.done && Array.isArray(data.generations) && data.generations.length > 0){
-            const generations:{text:string}[] = data.generations
-            if(generations && generations.length > 0){
+        if (data.done && Array.isArray(data.generations) && data.generations.length > 0) {
+            const generations: { text: string }[] = data.generations
+            if (generations && generations.length > 0) {
                 return {
                     type: "success",
                     result: unstringlizeChat(generations[0].text, formated, currentChar?.name ?? '')
@@ -1465,7 +1465,7 @@ async function requestHorde(arg:RequestDataArgumentExtended):Promise<requestData
     }
 }
 
-async function requestWebLLM(arg:RequestDataArgumentExtended):Promise<requestDataResponse> {
+async function requestWebLLM(arg: RequestDataArgumentExtended): Promise<requestDataResponse> {
     const formated = arg.formated
     const db = getDatabase()
     const aiModel = arg.aiModel
@@ -1475,7 +1475,7 @@ async function requestWebLLM(arg:RequestDataArgumentExtended):Promise<requestDat
     const realModel = aiModel.split(":::")[1]
     const prompt = applyChatTemplate(formated)
 
-    if(arg.previewBody){
+    if (arg.previewBody) {
         return {
             type: 'success',
             result: JSON.stringify({
