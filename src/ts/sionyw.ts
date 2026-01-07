@@ -2,16 +2,13 @@ import { hubURL } from "./characterCards";
 import { fetchNative } from "./globalApi.svelte";
 import { DBState } from "./stores.svelte";
 import { readFile, BaseDirectory, writeFile } from "@tauri-apps/plugin-fs";
+import { isTauri } from "src/ts/platform"
 import * as client from 'openid-client'
 
 let accessToken = ''
 let refreshToken = ''
 let tokenInitalized = false
 let tokenExpiry = 0 // Unix timestamp in milliseconds
-
-//isTauri is NOT IMPORTED due to circular dependency issues
-//@ts-expect-error __TAURI_INTERNALS__ is injected by Tauri runtime, not defined in Window interface
-const isTauri = !!window.__TAURI_INTERNALS__
 
 interface SionywOauthData {
     refresh_token: string;
@@ -65,7 +62,7 @@ export async function fetchProtectedResource(url: string, options: RequestInit =
     return fetchProtectedResourceSPA(url, options, arg)
 }
 
-const readFileUnSecure = isTauri ? readFile : async (path:string, options:any) => {
+const readFileUnSecure = isTauri ? readFile : (path:string, options:any) => {
     const data = localStorage.getItem(path)
     if(!data){
         throw new Error("File not found")
@@ -73,7 +70,7 @@ const readFileUnSecure = isTauri ? readFile : async (path:string, options:any) =
     return Buffer.from(data, 'base64')
 }
 
-const writeFileUnSecure = isTauri ? writeFile : async (path:string, data:Uint8Array, options:any) => {
+const writeFileUnSecure = isTauri ? writeFile : (path:string, data:Uint8Array, options:any) => {
     localStorage.setItem(path, Buffer.from(data).toString('base64'))
 }
 
@@ -306,7 +303,7 @@ async function loginToSionywSPAVersion(){
     let code_verifier: string = client.randomPKCECodeVerifier()
     let code_challenge: string =  await client.calculatePKCECodeChallenge(code_verifier)
 
-    const authUrl = await client.buildAuthorizationUrl(config, {
+    const authUrl = client.buildAuthorizationUrl(config, {
         redirect_uri: 'risuai://sionyw/callback',
         scope: 'risuai refresh_token',
         code_challenge_method: 'S256',

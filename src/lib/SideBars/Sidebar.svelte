@@ -10,7 +10,10 @@
     OpenRealmStore,
     PlaygroundStore,
 
-    QuickSettings
+    QuickSettings,
+
+    additionalHamburgerMenu
+
 
   } from "../../ts/stores.svelte";
     import { setDatabase, type folder } from "../../ts/storage/database.svelte";
@@ -47,6 +50,7 @@
   import { sideBarSize } from "src/ts/gui/guisize";
   import DevTool from "./DevTool.svelte";
     import QuickSettingsGui from "../Others/QuickSettingsGUI.svelte";
+    import PluginDefinedIcon from "../Others/PluginDefinedIcon.svelte";
   let sideBarMode = $state(0);
   let editMode = $state(false);
   let menuMode = $state(0);
@@ -269,6 +273,7 @@
   }
   const avatarDragStart = (ind:DragData, e:DragEv) => {
     e.dataTransfer.setData('text/plain', '');
+    e.dataTransfer.setData('application/x-risu-internal', 'true');
     currentDrag = ind
     const avatar = e.currentTarget.querySelector('.avatar')
     if(avatar){
@@ -417,6 +422,17 @@
           PlaygroundStore.set(1)
         }}
       ><ShellIcon /></BarIcon>
+      {#each additionalHamburgerMenu as menu}
+        <div class="mt-2"></div>
+        <BarIcon
+          onClick={() => {
+            reseter();
+            menu.callback();
+          }}>
+            <PluginDefinedIcon ico={menu} />
+          </BarIcon
+        >
+      {/each}
       <div class="mt-2"></div>
       <BarIcon
         onClick={() => {

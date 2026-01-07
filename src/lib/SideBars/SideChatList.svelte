@@ -42,7 +42,7 @@
     import { bookmarkListOpen } from "src/ts/stores.svelte";
     import { language } from "src/lang";
     import Toggles from "./Toggles.svelte";
-    import { changeChatTo } from "src/ts/globalApi.svelte";
+    import { changeChatTo, createChatCopyName } from "src/ts/globalApi.svelte";
 
     interface Props {
         chara: character | groupChat;
@@ -266,110 +266,93 @@
                                     $ReloadGUIPointer += 1;
                                 }
                             }}
-                            class="flex items-center text-textcolor border-solid border-0 border-darkborderc p-2 cursor-pointer rounded-md"
-                            class:bg-red-900={folder.color === "red"}
-                            class:bg-yellow-900={folder.color === "yellow"}
-                            class:bg-green-900={folder.color === "green"}
-                            class:bg-blue-900={folder.color === "blue"}
-                            class:bg-indigo-900={folder.color === "indigo"}
-                            class:bg-purple-900={folder.color === "purple"}
-                            class:bg-pink-900={folder.color === "pink"}
+                            class="flex w-full items-center p-2 text-textcolor"
                         >
                             {#if editMode}
                                 <TextInput
-                                    bind:value={chara.chatFolders[i].name}
+                                    bind:value={folder.name}
                                     className="grow min-w-0"
                                     padding={false}
                                 />
                             {:else}
-                                <span>{folder.name}</span>
+                                <span class="grow font-bold">{folder.name}</span
+                                >
                             {/if}
-                            <div class="grow flex justify-end">
-                                <div
-                                    role="button"
-                                    tabindex="0"
-                                    onkeydown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.currentTarget.click();
-                                        }
-                                    }}
-                                    class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
-                                    onclick={async (e) => {
-                                        e.stopPropagation();
-                                        const sel = parseInt(
-                                            await alertSelect([
-                                                language.changeFolderColor,
-                                                language.cancel,
-                                            ]),
-                                        );
-                                        switch (sel) {
-                                            case 0:
-                                                const colors = [
-                                                    "red",
-                                                    "green",
-                                                    "blue",
-                                                    "yellow",
-                                                    "indigo",
-                                                    "purple",
-                                                    "pink",
-                                                    "default",
-                                                ];
-                                                const sel = parseInt(
-                                                    await alertSelect(colors),
-                                                );
-                                                folder.color = colors[sel];
-                                                break;
-                                        }
-                                    }}
-                                >
-                                    <MenuIcon size={18} />
-                                </div>
-                                <div
-                                    role="button"
-                                    tabindex="0"
-                                    onkeydown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.currentTarget.click();
-                                        }
-                                    }}
-                                    class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
-                                    onclick={() => {
-                                        editMode = !editMode;
-                                    }}
-                                >
-                                    <PencilIcon size={18} />
-                                </div>
-                                <div
-                                    role="button"
-                                    tabindex="0"
-                                    onkeydown={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.currentTarget.click();
-                                        }
-                                    }}
-                                    class="text-textcolor2 hover:text-green-500 cursor-pointer"
-                                    onclick={async (e) => {
-                                        e.stopPropagation();
-                                        const d = await alertConfirm(
-                                            `${language.removeConfirm}${folder.name}`,
-                                        );
-                                        if (d) {
-                                            $ReloadGUIPointer += 1;
-                                            const folders = chara.chatFolders;
-                                            folders.splice(i, 1);
-                                            chara.chats.forEach((chat) => {
-                                                if (
-                                                    chat.folderId == folder.id
-                                                ) {
-                                                    chat.folderId = null;
-                                                }
-                                            });
-                                            chara.chatFolders = folders;
-                                        }
-                                    }}
-                                >
-                                    <TrashIcon size={18} />
-                                </div>
+                            <div
+                                class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
+                                onclick={async (e) => {
+                                    e.stopPropagation();
+                                    const sel = parseInt(
+                                        await alertSelect([
+                                            language.changeFolderColor,
+                                            language.cancel,
+                                        ]),
+                                    );
+                                    switch (sel) {
+                                        case 0:
+                                            const colors = [
+                                                "red",
+                                                "green",
+                                                "blue",
+                                                "yellow",
+                                                "indigo",
+                                                "purple",
+                                                "pink",
+                                                "default",
+                                            ];
+                                            const sel = parseInt(
+                                                await alertSelect(colors),
+                                            );
+                                            folder.color = colors[sel];
+                                            break;
+                                    }
+                                }}
+                            >
+                                <MenuIcon size={18} />
+                            </div>
+                            <div
+                                role="button"
+                                tabindex="0"
+                                onkeydown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.currentTarget.click();
+                                    }
+                                }}
+                                class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
+                                onclick={() => {
+                                    editMode = !editMode;
+                                }}
+                            >
+                                <PencilIcon size={18} />
+                            </div>
+                            <div
+                                role="button"
+                                tabindex="0"
+                                onkeydown={(e) => {
+                                    if (e.key === "Enter") {
+                                        e.currentTarget.click();
+                                    }
+                                }}
+                                class="text-textcolor2 hover:text-green-500 cursor-pointer"
+                                onclick={async (e) => {
+                                    e.stopPropagation();
+                                    const d = await alertConfirm(
+                                        `${language.removeConfirm}${folder.name}`,
+                                    );
+                                    if (d) {
+                                        $ReloadGUIPointer += 1;
+                                        const folders = chara.chatFolders;
+                                        folders.splice(i, 1);
+                                        chara.chats.forEach((chat) => {
+                                            if (chat.folderId == folder.id) {
+                                                chat.folderId = null;
+                                            }
+                                        });
+                                        chara.chatFolders = folders;
+                                    }
+                                }}
+                            >
+                                <TrashIcon size={18} />
                             </div>
                         </button>
                         <!-- chats in folder -->
@@ -766,7 +749,7 @@
                                     class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
                                     onclick={async (e) => {
                                         e.stopPropagation();
-                                        exportChat(i);
+                                        exportChat(chara.chats.indexOf(chat));
                                     }}
                                 >
                                     <DownloadIcon size={18} />
@@ -795,7 +778,10 @@
                                             changeChatTo(0);
                                             $ReloadGUIPointer += 1;
                                             let chats = chara.chats;
-                                            chats.splice(i, 1);
+                                            chats.splice(
+                                                chara.chats.indexOf(chat),
+                                                1,
+                                            );
                                             chara.chats = chats;
                                         }
                                     }}

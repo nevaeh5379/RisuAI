@@ -20,7 +20,6 @@ export const SizeStore = writable({
     h: 0
 })
 
-const t = 'https://raw.githubusercontent.com/ProjectAliceDev/ProjectAliceDev.github.io/master/'
 export const loadedStore = writable(false)
 export const DynamicGUI = writable(false)
 export const sideBarClosing = writable(false)
@@ -42,6 +41,7 @@ export const ShowVN = writable(false)
 export const SettingsMenuIndex = writable(-1)
 export const ReloadGUIPointer = writable(0)
 export const ReloadChatPointer = writable({} as Record<number, number>)
+export const ScrollToMessageStore = $state({ value: -1 })
 export const OpenRealmStore = writable(false)
 export const RealmInitialOpenChar = writable<null | hubType>(null)
 export const ShowRealmFrameStore = writable('')

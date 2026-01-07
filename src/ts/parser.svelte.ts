@@ -2,7 +2,8 @@ import DOMPurify from 'dompurify';
 import markdownit from 'markdown-it'
 import { appVer, getCurrentCharacter, getDatabase, type Database, type character, type customscript, type groupChat, type triggerscript } from './storage/database.svelte';
 import { DBState } from './stores.svelte';
-import { aiWatermarkingLawApplies, getFileSrc, isNodeServer, isTauri } from './globalApi.svelte';
+import { aiWatermarkingLawApplies, getFileSrc } from './globalApi.svelte';
+import { isTauri, isNodeServer } from "src/ts/platform"
 import { processScriptFull } from './process/scripts';
 import { get } from 'svelte/store';
 import css, { type CssAtRuleAST } from '@adobe/css-tools'
@@ -49,6 +50,17 @@ DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
        }
     }
     if(data.tagName === 'img'){
+        // Hide external images when hideAllImages is enabled
+        if(DBState.db?.hideAllImages){
+            const src = node.getAttribute("src") || "";
+            // Replace with placeholder if it's an external/loaded image
+            if(src && !src.startsWith('data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP')){
+                node.setAttribute("src", "/none.webp");
+                node.setAttribute("alt", "?");
+            }
+            return;
+        }
+        
         const loading = node.getAttribute("loading")
         if(!loading){
             node.setAttribute("loading","lazy")
@@ -65,6 +77,13 @@ DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
 DOMPurify.addHook("uponSanitizeAttribute", (node, data) => {
     switch(data.attrName){
         case 'style':{
+            // Remove background-image URLs when hideAllImages is enabled
+            if(DBState.db?.hideAllImages && data.attrValue){
+                // Remove background-image property from inline styles
+                data.attrValue = data.attrValue.replace(/background(-image)?:\s*url\([^)]*\);?/gi, '')
+                // Also remove background property if it contains url()
+                data.attrValue = data.attrValue.replace(/background:\s*[^;]*url\([^)]*\)[^;]*;?/gi, '')
+            }
             break
         }
         case 'class':{
@@ -419,7 +438,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
     let assetPaths:AssetPaths = {}
     let emoPaths:AssetPaths = {}
 
-    if (char.emotionImages) await getEmoSrc(char.emotionImages, emoPaths)
+    if (char.emotionImages) getEmoSrc(char.emotionImages, emoPaths)
 
     const videoExtention = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
     let needsSourceAccess = false
@@ -437,6 +456,13 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
 
     data = await replaceAsync(data, assetRegex, async (full:string, type:string, name:string) => {
         name = name.toLocaleLowerCase()
+
+        // Skip image-related assets when hideAllImages is enabled
+        // raw and path are also included as they're used in CSS background-image
+        const imageTypes = ['img', 'image', 'emotion', 'asset', 'bg', 'raw', 'path']
+        if(DBState.db.hideAllImages && imageTypes.includes(type)){
+            return ''  // Hide the image asset
+        }
 
         if(type === 'emotion'){
             const srcPath = emoPaths[name]?.srcPaths?.[0]
@@ -615,6 +641,11 @@ async function parseInlayAssets(data:string){
             } 
             switch(asset?.type){
                 case 'image':
+                    // Hide inlay images when hideAllImages is enabled
+                    if(DBState.db.hideAllImages){
+                        data = data.replace(inlay, '')
+                        break
+                    }
                     data = data.replace(inlay, `${prefix}<img src="${url}"/>${postfix}`)
                     break
                 case 'video':
@@ -643,11 +674,11 @@ export interface simpleCharacterArgument{
 function parseThoughtsAndTools(data:string){
     let result = '', i = 0
     while (i < data.length) {
-        if (data.substr(i, 10) === '<Thoughts>') {
+        if (data.slice(i, i + 10) === '<Thoughts>') {
             let j = i + 10, depth = 1
             while (j < data.length && depth > 0) {
-                if (data.substr(j, 10) === '<Thoughts>') depth++
-                if (data.substr(j, 11) === '</Thoughts>') depth--
+                if (data.slice(j, j + 10) === '<Thoughts>') depth++
+                if (data.slice(j, j + 11) === '</Thoughts>') depth--
                 j++
             }
             if (depth === 0) {
@@ -1208,7 +1239,7 @@ function makeArray(p1:string[]):string{
     }))
 }
 
-function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,type2?:string,funcArg?:string[]}{
+function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,type2?:string,funcArg?:string[],mode?:string}{
     if(p1.startsWith('#if') || p1.startsWith('#if_pure ')){
         const statement = p1.split(' ', 2)
         const state = statement[1]
@@ -1253,10 +1284,12 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case 'keep':{
                         mode = 'keep'
+                        statement.push(condition)
                         break
                     }
                     case 'legacy':{
                         mode = 'legacy'
+                        statement.push(condition)
                         break
                     }
                     case 'and':{
@@ -1362,7 +1395,7 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case '>':{
                         const condition2 = statement.pop()
-                        if(parseFloat(condition) > parseFloat(condition2)){
+                        if(parseFloat(condition2) > parseFloat(condition)){
                             statement.push('1')
                         }
                         else{
@@ -1372,7 +1405,7 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case '<':{
                         const condition2 = statement.pop()
-                        if(parseFloat(condition) < parseFloat(condition2)){
+                        if(parseFloat(condition2) < parseFloat(condition)){
                             statement.push('1')
                         }
                         else{
@@ -1382,7 +1415,7 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case '>=':{
                         const condition2 = statement.pop()
-                        if(parseFloat(condition) >= parseFloat(condition2)){
+                        if(parseFloat(condition2) >= parseFloat(condition)){
                             statement.push('1')
                         }
                         else{
@@ -1392,7 +1425,7 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case '<=':{
                         const condition2 = statement.pop()
-                        if(parseFloat(condition) <= parseFloat(condition2)){
+                        if(parseFloat(condition2) <= parseFloat(condition)){
                             statement.push('1')
                         }
                         else{
@@ -1458,10 +1491,15 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
     }
     if(p1.startsWith('#each')){
         let t2 = p1.substring(5).trim()
+        let mode: string | undefined
+        if(t2.startsWith('::keep ')){
+            mode = 'keep'
+            t2 = t2.substring(7).trim()
+        }
         if(t2.startsWith('as ')){
             t2 = t2.substring(3).trim()
         }
-        return {type:'each',type2:t2}
+        return {type:'each', type2:t2, mode}
     }
     if(p1.startsWith('#func')){
         const statement = p1.split(' ')
@@ -1470,7 +1508,6 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
         }
 
     }
-
 
     return {type:'nothing'}
 }
@@ -1481,7 +1518,7 @@ function trimLines(p1:string){
     }).join('\n').trim()
 }
 
-function blockEndMatcher(p1:string,type:{type:blockMatch,type2?:string},matcherArg:matcherArg):string{
+function blockEndMatcher(p1:string,type:{type:blockMatch,type2?:string,mode?:string},matcherArg:matcherArg):string{
     const p1Trimed = p1.trim() 
     switch(type.type){
         case 'pure':
@@ -1489,8 +1526,13 @@ function blockEndMatcher(p1:string,type:{type:blockMatch,type2?:string},matcherA
         case 'function':{
             return p1Trimed
         }
-        case 'parse':
+        case 'parse':{
+            return trimLines(p1Trimed)
+        }
         case 'each':{
+            if(type.mode === 'keep'){
+                return p1
+            }
             return trimLines(p1Trimed)
         }
         case 'ifpure':{
@@ -1627,7 +1669,6 @@ export function risuChatParser(da:string, arg:{
         }
     }
 
-    
     let pointer = 0;
     let nested:string[] = [""]
     let stackType = new Uint8Array(512)
@@ -1637,6 +1678,7 @@ export function risuChatParser(da:string, arg:{
         type:blockMatch,
         type2?:string
         funcArg?:string[]
+        mode?:string
     }> = new Map()
     let commentMode = false
     let commentLatest:string[] = [""]
@@ -1667,6 +1709,12 @@ export function risuChatParser(da:string, arg:{
         consistantChar: arg.consistantChar ?? false,
         cbsConditions: arg.cbsConditions ?? {},
         callStack: arg.callStack,
+        getNested: () => {
+            return nested
+        },
+        setNestedRoot: (val:string) => {
+            nested[0] = val
+        }
     }
 
     da = da.replace(/\<(user|char|bot)\>/gi, '{{$1}}')
@@ -1674,12 +1722,7 @@ export function risuChatParser(da:string, arg:{
     const isPureMode = () => {
         return pureModeNest.size > 0
     }
-    const pureModeType = () => {
-        if(pureModeNest.size === 0){
-            return ''
-        }
-        return pureModeNestType.get(nested.length) ?? [...pureModeNestType.values()].at(-1) ?? ''
-    }
+
     while(pointer < da.length){
         switch(da[pointer]){
             case '{':{
@@ -1751,15 +1794,24 @@ export function risuChatParser(da:string, arg:{
                         const dat2 = nested.shift()
                         const matchResult = blockEndMatcher(dat2, blockType, matcherObj)
                         if(blockType.type === 'each'){
-                            const subind = blockType.type2.lastIndexOf(' ')
-                            const sub = blockType.type2.substring(subind + 1)
-                            const array = parseArray(blockType.type2.substring(0, subind))
+                            const asIndex = blockType.type2.lastIndexOf(' as ')
+                            let sub = blockType.type2.substring(asIndex + 4).trim()
+                            let array = parseArray(blockType.type2.substring(0, asIndex))
+                            if(asIndex === -1){
+                                //compability mode
+                                const subind = blockType.type2.lastIndexOf(' ')
+                                if(subind === -1){
+                                    break
+                                }
+                                sub = blockType.type2.substring(subind + 1)
+                                array = parseArray(blockType.type2.substring(0, subind))
+                            }
                             let added = ''
                             for(let i = 0;i < array.length;i++){
                                 const res = matchResult.replaceAll(`{{slot::${sub}}}`, array[i])
                                 added += res
                             }
-                            da = da.substring(0, pointer + 1) + added.trim() + da.substring(pointer + 1)
+                            da = da.substring(0, pointer + 1) + (blockType.mode === 'keep' ? added : added.trim()) + da.substring(pointer + 1)
                             break
                         }
                         if(blockType.type === 'function'){
@@ -1815,8 +1867,8 @@ export function risuChatParser(da:string, arg:{
                 else{
                     nested[0] += mc.text
                     tempVar = mc.var
-                    if(tempVar?.['__force_return__']){
-                        return tempVar?.['__return__'] ?? 'null'
+                    if(tempVar['__force_return__']){
+                        return tempVar['__return__'] ?? 'null'
                     }
                 }
                 break
@@ -1889,7 +1941,7 @@ export function setChatVar(key:string, value:string){
 }
 
 
-async function editDisplay(text){
+function editDisplay(text){
     let rt = ""
     if(!text.includes("<obs>")){
         return text
@@ -1907,7 +1959,7 @@ async function editDisplay(text){
 
 export type PromptParsed ={[key:string]:string|PromptParsed}
 
-export async function promptTypeParser(prompt:string):Promise<string | PromptParsed>{
+export function promptTypeParser(prompt:string):string | PromptParsed{
     //XML type
     try {
         const parser = new DOMParser()

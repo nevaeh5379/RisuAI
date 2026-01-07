@@ -84,6 +84,9 @@ export class AccountStorage{
         if(da.status < 200 || da.status >= 300){
             throw await getDaText()
         }
+        if(key.startsWith('assets/')){
+            await localforage.setItem(key, new Uint8Array(value).buffer)
+        }
         return await getDaText()
     }
     async getItem(key:string, callback?:(status:number) => void):Promise<Buffer> {
@@ -154,11 +157,11 @@ export class AccountStorage{
 
         return Buffer.from(appendable)
     }
-    async keys():Promise<string[]>{
+    keys():string[]{
         let db = getDatabase()
         return getUnpargeables(db, 'pure')
     }
-    async removeItem(key:string){
+    removeItem(key:string){
         throw "Error: You cannot remove data in account. report this to dev if you found this."
     }
 

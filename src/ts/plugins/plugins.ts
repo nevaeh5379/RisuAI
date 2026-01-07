@@ -26,6 +26,7 @@ interface ProviderPlugin {
     argMeta: { [key: string]: {[key:string]:string} }
     versionOfPlugin?: string
     updateURL?: string
+    enabled?: boolean
 }
 interface ProviderPluginCustomLink {
     link: string
@@ -414,7 +415,8 @@ export async function importPlugin(code:string|null = null, argu:{
             customLink: customLink,
             argMeta: argMeta,
             versionOfPlugin: versionOfPlugin,
-            updateURL: updateURL
+            updateURL: updateURL,
+            enabled: true
         }
 
         db.plugins ??= []
@@ -463,9 +465,9 @@ export async function loadPlugins() {
     let db = getDatabase()
 
 
-    const structuredCloned = safeStructuredClone(db.plugins)
-    const pluginV2 = structuredCloned.filter((a: RisuPlugin) => a.version === 2 || a.version === '2.1')
-    const pluginV3 = structuredCloned.filter((a: RisuPlugin) => a.version === '3.0')
+    const enabledPlugins = safeStructuredClone(db.plugins).filter((p: RisuPlugin) => p.enabled)
+    const pluginV2 = enabledPlugins.filter((a: RisuPlugin) => a.version === 2 || a.version === '2.1')
+    const pluginV3 = enabledPlugins.filter((a: RisuPlugin) => a.version === '3.0')
 
     await loadV2Plugin(pluginV2)
     await loadV3Plugins(pluginV3)
@@ -505,7 +507,7 @@ export const pluginV2 = {
     loaded: false
 }
 
-const allowedDbKeys = [
+export const allowedDbKeys = [
     'characters',
     'modules',
     'enabledModules',
@@ -847,36 +849,39 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
             version = 2
         }
 
+        const createRealScript = (data:string) => {
+            return `(async () => {
+                const risuFetch = globalThis.__pluginApis__.risuFetch
+                const nativeFetch = globalThis.__pluginApis__.nativeFetch
+                const getArg = globalThis.__pluginApis__.getArg
+                const printLog = globalThis.__pluginApis__.printLog
+                const getChar = globalThis.__pluginApis__.getChar
+                const setChar = globalThis.__pluginApis__.setChar
+                const addProvider = globalThis.__pluginApis__.addProvider
+                const addRisuScriptHandler = globalThis.__pluginApis__.addRisuScriptHandler
+                const removeRisuScriptHandler = globalThis.__pluginApis__.removeRisuScriptHandler
+                const addRisuReplacer = globalThis.__pluginApis__.addRisuReplacer
+                const removeRisuReplacer = globalThis.__pluginApis__.removeRisuReplacer
+                const onUnload = globalThis.__pluginApis__.onUnload
+                const setArg = globalThis.__pluginApis__.setArg
+                ${version === '2.1' ? `
+                    const safeGlobalThis = globalThis.__pluginApis__.getSafeGlobalThis()
+                    const Risuai = globalThis.__pluginApis__
+                    const safeLocalStorage = globalThis.__pluginApis__.safeLocalStorage
+                    const safeIdbFactory = globalThis.__pluginApis__.safeIdbFactory
+                    const alertStore = globalThis.__pluginApis__.alertStore
+                    const safeDocument = globalThis.__pluginApis__.safeDocument
+                    const getDatabase = globalThis.__pluginApis__.getDatabase
+                    const setDatabaseLite = globalThis.__pluginApis__.setDatabaseLite
+                    const setDatabase = globalThis.__pluginApis__.setDatabase
+                    const loadPlugins = globalThis.__pluginApis__.loadPlugins
+                    const SafeFunction = globalThis.__pluginApis__.SafeFunction
+                ` : ''}
 
-        const realScript = `(async () => {
-            const risuFetch = globalThis.__pluginApis__.risuFetch
-            const nativeFetch = globalThis.__pluginApis__.nativeFetch
-            const getArg = globalThis.__pluginApis__.getArg
-            const printLog = globalThis.__pluginApis__.printLog
-            const getChar = globalThis.__pluginApis__.getChar
-            const setChar = globalThis.__pluginApis__.setChar
-            const addProvider = globalThis.__pluginApis__.addProvider
-            const addRisuScriptHandler = globalThis.__pluginApis__.addRisuScriptHandler
-            const removeRisuScriptHandler = globalThis.__pluginApis__.removeRisuScriptHandler
-            const addRisuReplacer = globalThis.__pluginApis__.addRisuReplacer
-            const removeRisuReplacer = globalThis.__pluginApis__.removeRisuReplacer
-            const onUnload = globalThis.__pluginApis__.onUnload
-            const setArg = globalThis.__pluginApis__.setArg
-            ${version === '2.1' ? `
-                const safeGlobalThis = globalThis.__pluginApis__.getSafeGlobalThis()
-                const Risuai = globalThis.__pluginApis__
-                const safeLocalStorage = globalThis.__pluginApis__.safeLocalStorage
-                const safeIdbFactory = globalThis.__pluginApis__.safeIdbFactory
-                const alertStore = globalThis.__pluginApis__.alertStore
-                const safeDocument = globalThis.__pluginApis__.safeDocument
-                const getDatabase = globalThis.__pluginApis__.getDatabase
-                const setDatabaseLite = globalThis.__pluginApis__.setDatabaseLite
-                const setDatabase = globalThis.__pluginApis__.setDatabase
-                const loadPlugins = globalThis.__pluginApis__.loadPlugins
-                const SafeFunction = globalThis.__pluginApis__.SafeFunction
-            ` : ''}
-            ${data}
-        })();`
+                ${data}
+            })();`
+
+        }
 
         if(version === '2.1'){
             const safety = (await checkCodeSafety(plugin.script))
@@ -885,7 +890,7 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
             console.log('Loading V2.1 Plugin', plugin.name, data)
 
             try {
-                new Function(realScript)()
+                new Function(createRealScript(data))()
             } catch (error) {
                 console.error(error)
             }
@@ -897,7 +902,7 @@ export async function loadV2Plugin(plugins: RisuPlugin[]) {
             console.log('Loading V2.0 Plugin', plugin.name)
 
             try {
-                eval(data)
+                eval(createRealScript(data))
             } catch (error) {
                 console.error(error)
             }

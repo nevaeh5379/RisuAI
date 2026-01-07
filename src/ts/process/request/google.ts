@@ -926,10 +926,10 @@ function getTranStream():TransformStream<Uint8Array, StreamResponseChunk> {
     let buffer = '';
 
     return new TransformStream<Uint8Array, StreamResponseChunk>({
-        async transform(chunk, control) {
+        transform(chunk, control) {
             buffer += new TextDecoder().decode(chunk);
             const lines = buffer.split('\n');
-            
+
             let readed = initStreamState();
 
             try {
@@ -1147,6 +1147,7 @@ function wrapToolStream(
                                     response: "Streaming",
                                     success: true,
                                     url: url,
+                                    status: resRec.status,
                                 })
 
                                 errorFlag = false

@@ -292,28 +292,6 @@ export async function sendChat(chatProcessIndex = -1,arg:{
     nowChatroom.chats[selectedChat] = currentChat
     let maxContextTokens = DBState.db.maxContext
 
-    if(DBState.db.aiModel === 'gpt35'){
-        if(maxContextTokens > 4000){
-            maxContextTokens = 4000
-        }
-    }
-    if(DBState.db.aiModel === 'gpt35_16k' || DBState.db.aiModel === 'gpt35_16k_0613'){
-        if(maxContextTokens > 16000){
-            maxContextTokens = 16000
-        }
-    }
-    if(DBState.db.aiModel === 'gpt4'){
-        if(maxContextTokens > 8000){
-            maxContextTokens = 8000
-        }
-    }
-    if(DBState.db.aiModel === 'deepai'){
-        if(maxContextTokens > 3000){
-            maxContextTokens = 3000
-        }
-    }
-
-
     chatProcessStage.set(1)
     stageTimings.stage1Start = Date.now()
     let unformated = {
@@ -1874,11 +1852,18 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                 maxTokens: 30,
             }, 'emotion', abortSignal)
 
-            if(rq.type === 'fail' || rq.type === 'streaming' || rq.type === 'multiline'){
+            if(rq.type === 'fail'){
                 if(abortSignal.aborted){
                     return true
                 }
-                throwError(`${rq.result}`)
+                throwError(rq.result)
+                return true
+            }
+            if(rq.type === 'streaming' || rq.type === 'multiline'){
+                if(abortSignal.aborted){
+                    return true
+                }
+                throwError('Unexpected response type')
                 return true
             }
             else{

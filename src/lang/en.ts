@@ -247,6 +247,16 @@ export const languageEnglish = {
             "Ignore the providers in this list, if all the provider is ingored, the request will failed. See detail on https://openrouter.ai/docs/guides/routing/provider-selection#ignoring-providers",
         additionalPrompt:
             "Text that gets appended to the Main Prompt when Prompt Preprocess is enabled. Default is 'The assistant must act as {{char}}. user is {{user}}.' This helps set up basic roleplay context.",
+        hideAllImagesDesc: "Hides bot icons, bot image assets, and RisuRealm cover images.",
+        embedding:
+            "Embedding model is used for similarity search across multiple features:\n\n" +
+            "- **Long Term Memory**: HypaV2, HypaV3, Hanurai Memory, and SupaMemory (with HypaMemory enabled)\n" +
+            "- **Additional Text**: Matching character additional info based on context\n" +
+            "- **Dynamic Assets**: Finding similar asset names when exact match is not found\n" +
+            "- **Emotion Images**: When Emotion method is set to 'embedding'\n" +
+            "- **Trigger Scripts**: Similarity conditions in trigger scripts\n" +
+            "- **File Attachments**: Searching within PDF/TXT/XML attachments\n" +
+            "- **Playground**: Embedding testing in Playground",
     },
     setup: {
         chooseProvider: "Choose AI Provider",
@@ -811,9 +821,9 @@ export const languageEnglish = {
     globalLoreBook: "Global Lorebook",
     globalRegexScript: "Global Regex",
     accessibility: "Accessibility",
-            sendWithEnter: "Send with Enter Key",
-            useMonacoEditor: "Use Monaco Editor (Beta)",
-            fixedChatTextarea: "Fixed at the bottom of the chat window(When unchecked, Shift + Enter changes to send a message.)",    clickToEdit: "Click Text to Edit",
+    sendWithEnter: "Send with Enter Key",
+    useMonacoEditor: "Use Monaco Editor (Beta)",
+    fixedChatTextarea: "Fixed at the bottom of the chat window(When unchecked, Shift + Enter changes to send a message.)", clickToEdit: "Click Text to Edit",
     setNodePassword: "Set your password to security",
     inputNodePassword: "Input your password. if you can't remember, remove save/__password.txt in your server files and restart the server.",
     simple: "Simple",
@@ -926,6 +936,7 @@ export const languageEnglish = {
     ifRandom: "If random",
     ifValue: "If Value",
     hideRealm: "Hide RisuRealm",
+    hideAllImages: "Hide All Images",
     popularityLevel: "{} Popularity",
     colorScheme: "Color Scheme",
     rangeStart: "Range Start",
@@ -1420,6 +1431,7 @@ export const languageEnglish = {
     bookmarkAskNameOrCancel: "Enter bookmark name. If not entered, rename will be canceled.",
     collapseAll: "Collapse All",
     expandAll: "Expand All",
+    noRequestLogs: "No request logs available.",
     hideErrorDetails: "Hide Error Details",
     showErrorDetails: "Show Error Details",
     dynamicOutput: "Dynamic Output",
@@ -1463,6 +1475,7 @@ export const languageEnglish = {
     aiGenerationWarning: "Contents will be AI generated and may contain inaccuracies or biases.",
     duplicatePluginFoundUpdateIt: "Duplicate plugin found. do you want to update the existing plugin?",
     pluginUpdateFoundInstallIt: "Plugin update found. do you want to install the update?",
+    goToChat: "Go to Chat",
     bookmark: "Bookmark",
     translate: "Translate",
     branch: "Branch",
@@ -1470,8 +1483,23 @@ export const languageEnglish = {
     loadMore: "Load More",
     disableMessage: "Disable Message",
     disableAbove: "Cut Messages for AI",
+    autoScrollToNewMessage: "Auto scroll to new message",
+    alwaysScrollToNewMessage: "Always scroll to new message (ignore scroll position)",
+    newMessage: "New Message",
+    newMessageButtonStyle: "New Message Button Style",
+    newMessageButtonBottomCenter: "Bottom Center (Default)",
+    newMessageButtonBottomRight: "Bottom Right",
+    newMessageButtonBottomLeft: "Bottom Left",
+    newMessageButtonFloatingCircle: "Floating Circle (Bottom Right)",
+    newMessageButtonRightCenter: "Right Center",
+    newMessageButtonTopBar: "Top Bar",
     trimStartNewChat: "Trim 'Start New Chat' Messages",
     pluginDevelopMode: "Plugin Develop Mode",
     studioMode: "Studio Mode",
     titleGeneration: "Title Generation",
+    fetchLogConsent: "Plugin {} is requesting to fetch logs, which may expose sensitive information. Do you want to allow this?",
+    getFullDatabaseConsent: "Plugin {} is requesting to access the full database, which may expose sensitive information. Do you want to allow this?",
+    mainDomAccessConsent: "Plugin {} is requesting to access the main Document, which may expose sensitive information. Do you want to allow this?",
+    pluginV2Warning: "Plugin V2 and V2.1 is considered unsafe and will stop working in future versions. **Please do not use these versions of plugins.**. If you are the developer of this plugin, please update to V3 as soon as possible.",
+    createFolderOnBranch: "Create Folder on Branch",
 }

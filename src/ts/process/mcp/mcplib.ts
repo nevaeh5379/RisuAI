@@ -72,6 +72,10 @@ export type RPCToolCallContentResource = {
 
 export type RPCToolCallContent = RPCToolCallTextContent | RPCToolCallImageAudioContent | RPCToolCallContentResource
 
+export abstract class MCPToolHandler {
+    abstract getTools(): MCPTool[];
+    abstract handle(toolName: string, args: any): Promise<RPCToolCallContent[] | null>;
+}
 
 export class MCPClient{
     mcpClientObjectId:string = v4()
@@ -475,7 +479,7 @@ export class MCPClient{
         return d
     }
 
-    async checkHandshake(){
+    checkHandshake(){
         if(this.initialized){
             return this.serverInfo
         }

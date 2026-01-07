@@ -1,8 +1,7 @@
-import { AppendableBuffer, isNodeServer, isTauri, saveAsset, type LocalWriter, type VirtualWriter } from "../globalApi.svelte";
+import { AppendableBuffer, saveAsset, type LocalWriter, type VirtualWriter } from "../globalApi.svelte";
 import * as fflate from "fflate";
 import { asBuffer, sleep } from "../util";
 import { alertStore } from "../alert";
-import { Capacitor } from "@capacitor/core";
 import { hasher } from "../parser.svelte";
 import { hubURL } from "../characterCards";
 
@@ -27,7 +26,7 @@ export class CharXWriter{
     apb = new AppendableBuffer()
     #takenFilenames:Set<string> = new Set()
     constructor(private writer:LocalWriter|WritableStreamDefaultWriter<Uint8Array>|VirtualWriter){
-        const handlerAsync = async (err:Error, dat:Uint8Array, final:boolean) => {
+        const handlerAsync = (err:Error, dat:Uint8Array, final:boolean) => {
             if(dat){
                 this.apb.append(dat)
             }
@@ -77,8 +76,8 @@ export class CharXWriter{
         const file = new fflate.ZipDeflate(key, {
             level: level ?? 0
         });
-        await this.zip.add(file)
-        await file.push(dat, true)
+        this.zip.add(file)
+        file.push(dat, true)
         await this.writer.write(this.apb.buffer)
         this.apb.clear()
         if(this.writeEnd){
@@ -113,7 +112,7 @@ export class CharXWriter{
     }
 
     async end(){
-        await this.zip.end()
+        this.zip.end()
         await this.writer.write(this.apb.buffer)
         this.apb.clear()
         if(this.writeEnd){
