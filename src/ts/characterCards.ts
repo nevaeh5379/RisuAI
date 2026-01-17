@@ -157,6 +157,11 @@ export async function importCharacterProcess(f:{
             }
         }
         await importer.done()
+        
+        // Debug: log asset mapping
+        console.log('[CharX Import] Asset mapping:', importer.assets)
+        console.log('[CharX Import] Card assets:', card.data.assets)
+        
         await importCharacterCardSpec(card, undefined, 'normal', importer.assets, lorebook)
         let db = getDatabase()
         return db.characters.length - 1
@@ -1434,6 +1439,13 @@ export async function exportCharacterCard(char:character, type:'png'|'json'|'cha
                             name = name.substring(0,100)
                         }
                         const ext = card.data.assets[i].ext === 'unknown' ? 'png' : card.data.assets[i].ext
+                        
+                        // Strip extension from name if it already ends with the extension to prevent duplication
+                        // e.g., "celia_sleepy.webm" with ext "webm" should become "celia_sleepy"
+                        if (name.toLowerCase().endsWith('.' + ext.toLowerCase())) {
+                            name = name.substring(0, name.length - ext.length - 1)
+                        }
+                        
                         const baseDir = card.data.assets[i].ext === 'unknown'
                             ? `assets/${type}/image`
                             : `assets/${type}/${itype}`
@@ -1554,19 +1566,23 @@ export function createBaseV3(char:character){
 
     if(char.emotionImages){
         for(const asset of char.emotionImages){
+            // Extract extension from uri path
+            const uriExt = asset[1]?.split('.').pop()?.toLowerCase() || 'png'
             assets.push({
                 type: 'emotion',
                 uri: asset[1],
                 name: asset[0],
-                ext: 'png'
+                ext: uriExt
             })
         }
     
+        // Extract extension from main image uri
+        const mainImageExt = char.image?.split('.').pop()?.toLowerCase() || 'png'
         assets.push({
             type: 'icon',
             uri: 'ccdefault:',
             name: 'main',
-            ext: 'png'
+            ext: mainImageExt
         })
     }
 

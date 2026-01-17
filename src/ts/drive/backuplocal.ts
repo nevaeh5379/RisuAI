@@ -622,6 +622,9 @@ export function LoadLocalBackupFast(){
                     }
                     const data = remainingBuffer.slice(offset + 4 + nameLength + 4, offset + 4 + nameLength + 4 + dataLength);
 
+                    // Debug logging
+                    console.log(`[Restore] Processing: ${name}, size: ${data.length}`);
+
                     if (name === 'database.risudat') {
                         // For database, we must finish all pending asset writes first to ensure consistency?
                         // Actually, database restore usually triggers specific logic. 

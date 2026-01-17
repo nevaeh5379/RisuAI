@@ -396,7 +396,7 @@ export class CharXImporter{
             acquired = true
             const assetSaveId = this.skipSaving
                 ? `assets/${await hasher(asset.data)}.png`
-                : await saveAsset(asset.data)
+                : await saveAsset(asset.data, '', asset.id)  // Pass filename to preserve extension
 
             this.assets[asset.id] = assetSaveId
         } catch (error) {

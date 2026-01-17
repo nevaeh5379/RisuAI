@@ -288,7 +288,9 @@ export async function saveAsset(data: Uint8Array, customId: string = '', fileNam
     else {
         let form = `assets/${id}.${fileExtension}`
         const replacer = await forageStorage.setItem(form, data)
-        if (replacer) {
+        // Only return replacer if it's a string (AccountStorage returns new path)
+        // NodeStorage returns number (mtime), which should be ignored
+        if (replacer && typeof replacer === 'string') {
             return replacer
         }
         return form
