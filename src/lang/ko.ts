@@ -593,6 +593,7 @@ export const languageKorean = {
     "activationKeys": "활성화 키",
     "activationKeysInfo": "\",\"로 나눠주세요",
     "useMonacoEditor": "Monaco 에디터 사용 (베타)",
+    "monacoEditorTheme": "Monaco 에디터 테마",
     "prompt": "프롬프트",
     "loreBookDepth": "로어북 검색 깊이",
     "loreBookToken": "로어북 최대 토큰",

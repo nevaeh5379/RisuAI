@@ -378,6 +378,7 @@ export function setDatabase(data: Database) {
     data.globalscript ??= []
     data.sendWithEnter ??= true
     data.useMonacoEditor ??= false
+    data.monacoEditorTheme ??= 'risu-cbs-dark'
     data.autoSuggestPrompt ??= defaultAutoSuggestPrompt
     data.autoSuggestPrefix ??= ""
     data.OAIPrediction ??= ''
@@ -913,6 +914,7 @@ export interface Database {
     sendWithEnter: boolean
     fixedChatTextarea: boolean
     useMonacoEditor: boolean
+    monacoEditorTheme: 'vs-dark' | 'vs' | 'hc-black' | 'risu-cbs-dark'
     clickToEdit: boolean
     koboldURL: string
     advancedBotSettings: boolean

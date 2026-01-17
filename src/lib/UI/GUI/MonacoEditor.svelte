@@ -41,7 +41,9 @@
             automaticLayout: false, // We use ResizeObserver
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
+            scrollBeyondLastColumn: 0,
             wordWrap: 'on',
+            wrappingStrategy: 'advanced',
             lineNumbers: 'off',
             glyphMargin: false,
             folding: false,
@@ -51,7 +53,8 @@
             hideCursorInOverviewRuler: true,
             scrollbar: {
                 vertical: autoResize ? 'hidden' : 'auto', 
-                horizontal: 'hidden'
+                horizontal: 'hidden',
+                useShadows: false
             },
             ...options
         });
@@ -126,9 +129,16 @@
 
     function updateTheme() {
         if (!monaco || !editor) return;
-        // Theme is already defined in registerCBS, just apply it or ensure transparent background if needed
-        // But registerCBS defines 'risu-cbs-dark'.
-        // If we want to support dynamic transparency, we can redefine or update it.
+        
+        const selectedTheme = DBState.db.monacoEditorTheme || 'risu-cbs-dark';
+        
+        // For built-in themes, just apply them directly
+        if (selectedTheme === 'vs' || selectedTheme === 'vs-dark' || selectedTheme === 'hc-black') {
+            editor.updateOptions({ theme: selectedTheme });
+            return;
+        }
+        
+        // For custom RisuAI theme with transparent background
         monaco.editor.defineTheme('risu-cbs-dark-transparent', {
             base: 'vs-dark',
             inherit: true,

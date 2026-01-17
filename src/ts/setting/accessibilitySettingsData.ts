@@ -53,6 +53,22 @@ export const accessibilitySettingsItems: SettingItem[] = [
         keywords: ['monaco', 'editor', 'code', 'highlight']
     },
     {
+        id: 'acc.monacoEditorTheme',
+        type: 'select',
+        labelKey: 'monacoEditorTheme',
+        bindKey: 'monacoEditorTheme',
+        condition: (ctx) => ctx.db.useMonacoEditor,
+        options: {
+            selectOptions: [
+                { value: 'risu-cbs-dark', label: 'RisuAI Dark (Transparent)' },
+                { value: 'vs-dark', label: 'VS Code Dark' },
+                { value: 'vs', label: 'VS Code Light' },
+                { value: 'hc-black', label: 'High Contrast' }
+            ]
+        },
+        keywords: ['monaco', 'editor', 'theme', 'color']
+    },
+    {
         id: 'acc.fixedChatTextarea',
         type: 'check',
         labelKey: 'fixedChatTextarea',

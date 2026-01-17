@@ -87,7 +87,7 @@ export async function SaveLocalBackupFast(){
             const batch = assets.slice(i, i + BATCH_SIZE);
             const readPromises = batch.map(async (asset) => {
                 const key = asset.name;
-                if (!key || !key.endsWith('.png')) {
+                if (!key) {
                     return null;
                 }
                 try {
@@ -127,7 +127,7 @@ export async function SaveLocalBackupFast(){
         for (let i = 0; i < keys.length; i += BATCH_SIZE) {
             const batch = keys.slice(i, i + BATCH_SIZE);
             const readPromises = batch.map(async (key) => {
-                if (!key || !key.endsWith('.png')) {
+                if (!key) {
                     return null;
                 }
                 
@@ -265,7 +265,7 @@ export async function SaveLocalBackupLegacy(){
             alertWait(message)
 
             const key = asset.name
-            if(!key || !key.endsWith('.png')){
+            if(!key){
                 continue
             }
             const data = await readFile('assets/' + asset.name, {baseDir: BaseDirectory.AppData})
@@ -291,7 +291,7 @@ export async function SaveLocalBackupLegacy(){
             }
             alertWait(message)
 
-            if(!key || !key.endsWith('.png')){
+            if(!key){
                 continue
             }
             let data: Uint8Array | undefined;

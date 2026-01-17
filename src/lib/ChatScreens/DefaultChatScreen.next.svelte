@@ -609,17 +609,7 @@
 
                 {#if !DBState.db.useAdvancedEditor}
                     <!-- Chat Input Area -->
-                    {#if !$MobileGUI && DBState.db.useMonacoEditor}
-                        <MonacoEditor
-                            bind:value={messageInput}
-                            placeholder={getPlaceHolder()}
-                            minHeight={40}
-                            maxHeight={500}
-                            onKeyDown={handleKeydown}
-                            onPaste={handlePaste}
-                        />
-                    {:else}
-                        <textarea
+                    <textarea
                             bind:this={inputEle}
                             bind:value={messageInput}
                             placeholder={getPlaceHolder()}
@@ -629,7 +619,6 @@
                             onkeydown={handleKeydown}
                             onpaste={handlePaste}
                         ></textarea>
-                    {/if}
                 {:else}
                     <AdvancedChatEditor
                         bind:value={messageInput}
