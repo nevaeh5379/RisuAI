@@ -398,7 +398,7 @@ export async function saveDb() {
         })
         $effect(() => {
             for (const key in DBState.db) {
-                if (key !== 'characters' && key !== 'botPresets' && key !== 'modules') {
+                if (key !== 'characters' && key !== 'botPresets' && key !== 'modules' && key !== 'statics' && key !== 'requestmet' && key !== 'requestLocation') {
                     $state.snapshot(DBState.db[key])
                 }
             }
