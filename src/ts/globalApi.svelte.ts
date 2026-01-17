@@ -353,7 +353,8 @@ export async function saveDb() {
 
     let encoder = new RisuSaveEncoder()
     await encoder.init(getDatabase(), {
-        compression: forageStorage.isAccount
+        compression: forageStorage.isAccount,
+        useRemote: forageStorage.isAccount
     })
 
     $effect.root(() => {
@@ -430,7 +431,8 @@ export async function saveDb() {
             if (requiresFullEncoderReload.state) {
                 encoder = new RisuSaveEncoder()
                 await encoder.init(getDatabase(), {
-                    compression: forageStorage.isAccount
+                    compression: forageStorage.isAccount,
+                    useRemote: forageStorage.isAccount
                 })
                 requiresFullEncoderReload.state = false
             }

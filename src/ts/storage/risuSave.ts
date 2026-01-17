@@ -104,12 +104,15 @@ export class RisuSaveEncoder {
 
     private blocks: { [key: string]: Uint8Array } = {};
     private compression: boolean = false;
+    private useRemote: boolean = false;
 
     async init(data:Database,arg:{
         compression?: boolean
+        useRemote?: boolean
     } = {}){
-        const { compression = false } = arg;
+        const { compression = false, useRemote = false } = arg;
         this.compression = compression;
+        this.useRemote = useRemote;
         let obj:Record<any,any> = {}
         let keys = Object.keys(data)
         for(const key of keys){
@@ -136,12 +139,22 @@ export class RisuSaveEncoder {
             name: 'modules'
         });
         for( const character of data.characters) {
-            this.blocks[character.chaId] = await this.encodeBlock({
-                compression,
-                data: JSON.stringify(character),
-                type: RisuSaveType.CHARACTER_WITH_CHAT,
-                name: character.chaId
-            });
+            if(this.useRemote){
+                this.blocks[character.chaId] = await this.encodeRemoteBlock({
+                    compression,
+                    data: JSON.stringify(character),
+                    type: RisuSaveType.CHARACTER_WITH_CHAT,
+                    name: character.chaId
+                });
+            }
+            else{
+                this.blocks[character.chaId] = await this.encodeBlock({
+                    compression,
+                    data: JSON.stringify(character),
+                    type: RisuSaveType.CHARACTER_WITH_CHAT,
+                    name: character.chaId
+                });
+            }
         }
         this.blocks['config'] = await this.encodeBlock({
             compression,
@@ -166,22 +179,42 @@ export class RisuSaveEncoder {
         for(const character of data.characters) {
             const index = toSave.character.indexOf(character.chaId);
             if (index !== -1) {
-                this.blocks[character.chaId] = await this.encodeBlock({
-                    compression: this.compression,
-                    data: JSON.stringify(character),
-                    type: RisuSaveType.CHARACTER_WITH_CHAT,
-                    name: character.chaId
-                });
+                if(this.useRemote){
+                    this.blocks[character.chaId] = await this.encodeRemoteBlock({
+                        compression: this.compression,
+                        data: JSON.stringify(character),
+                        type: RisuSaveType.CHARACTER_WITH_CHAT,
+                        name: character.chaId
+                    });
+                }
+                else{
+                    this.blocks[character.chaId] = await this.encodeBlock({
+                        compression: this.compression,
+                        data: JSON.stringify(character),
+                        type: RisuSaveType.CHARACTER_WITH_CHAT,
+                        name: character.chaId
+                    });
+                }
                 savedId.add(character.chaId);
                 toSave.character.splice(index, 1);
             }
             else if(!this.blocks[character.chaId]){
-                this.blocks[character.chaId] = await this.encodeBlock({
-                    compression: this.compression,
-                    data: JSON.stringify(character),
-                    type: RisuSaveType.CHARACTER_WITH_CHAT,
-                    name: character.chaId
-                });
+                if(this.useRemote){
+                    this.blocks[character.chaId] = await this.encodeRemoteBlock({
+                        compression: this.compression,
+                        data: JSON.stringify(character),
+                        type: RisuSaveType.CHARACTER_WITH_CHAT,
+                        name: character.chaId
+                    });
+                }
+                else{
+                    this.blocks[character.chaId] = await this.encodeBlock({
+                        compression: this.compression,
+                        data: JSON.stringify(character),
+                        type: RisuSaveType.CHARACTER_WITH_CHAT,
+                        name: character.chaId
+                    });
+                }
                 savedId.add(character.chaId);
             }
         }
