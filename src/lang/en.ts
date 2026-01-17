@@ -260,6 +260,15 @@ export const languageEnglish = {
             "- **File Attachments**: Searching within PDF/TXT/XML attachments\n" +
             "- **Playground**: Embedding testing in Playground",
     },
+    statistics: "Statistics",
+    general: "General",
+    totalMessages: "Total Messages",
+    totalInputTokens: "Total Input Tokens",
+    totalOutputTokens: "Total Output Tokens",
+    totalTokens: "Total Tokens",
+    timeSpent: "Time Spent",
+    modelUsage: "Model Usage",
+    botUsage: "Bot Usage",
     setup: {
         chooseProvider: "Choose AI Provider",
         openaikey: "OpenAI with API Key (Recommended)",

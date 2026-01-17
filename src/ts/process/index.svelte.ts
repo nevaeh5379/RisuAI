@@ -30,6 +30,8 @@ import { hypaMemoryV2 } from "./memory/hypav2";
 import { runLuaEditTrigger } from "./scriptings";
 import { getModelInfo, LLMFlags } from "../model/modellist";
 import { hypaMemoryV3 } from "./memory/hypav3";
+import { decodeToolCall, encodeToolCall } from "./mcp/mcp";
+import { addTokenUsage, incrementMessageCount } from "./statistics";
 import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 
@@ -195,7 +197,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         chatProcessStage.set(0)
     }
 
-    DBState.db.statics.messages += 1
+    incrementMessageCount(DBState.db.characters[get(selectedCharID)].chaId, DBState.db.aiModel)
     let selectedChar = get(selectedCharID)
     const nowChatroom = DBState.db.characters[selectedChar]
     nowChatroom.lastInteraction = Date.now()
@@ -1524,6 +1526,10 @@ export async function sendChat(chatProcessIndex = -1,arg:{
                 break
             }   
         }
+        (async () => {
+            const outputTokenCount = await tokenize(result || '');
+            addTokenUsage(inputTokens, outputTokenCount);
+        })();
 
         addRerolls(generationId, Object.values(lastResponseChunk))
 
@@ -1566,7 +1572,11 @@ export async function sendChat(chatProcessIndex = -1,arg:{
             if(DBState.db.removeIncompleteResponse){
                 result2.data = trimUntilPunctuation(result2.data)
             }
-            result = result2.data
+            result = result2.data;
+            (async () => {
+                const outputTokenCount = await tokenize(result || '');
+                addTokenUsage(inputTokens, outputTokenCount);
+            })();
             const inlayResult = runInlayScreen(currentChar, result)
             result = inlayResult.text
             emoChanged = result2.emoChanged

@@ -1,7 +1,8 @@
 <script lang="ts">
-    import { AccessibilityIcon, ActivityIcon, PackageIcon, BotIcon, BoxIcon, CodeIcon, ContactIcon, LanguagesIcon, MonitorIcon, Sailboat, UserIcon, CircleXIcon, KeyboardIcon } from "@lucide/svelte";
+    import { AccessibilityIcon, ActivityIcon, PackageIcon, BotIcon, BoxIcon, CodeIcon, ContactIcon, LanguagesIcon, MonitorIcon, Sailboat, UserIcon, CircleXIcon, KeyboardIcon, BarChartIcon } from "@lucide/svelte";
     import { language } from "src/lang";
     import DisplaySettings from "./Pages/DisplaySettings.svelte";
+    import StatisticsPage from "./Pages/StatisticsPage.svelte";
     import UserSettings from "./Pages/UserSettings.svelte";
     import BotSettings from "./Pages/BotSettings.svelte";
     import OtherBotSettings from "./Pages/OtherBotSettings.svelte";
@@ -144,6 +145,15 @@
                         <span>{language.advancedSettings}</span>
                     </button>
                     <button class="flex gap-2 items-center hover:text-textcolor"
+                        class:text-textcolor={$SettingsMenuIndex === 16}
+                        class:text-textcolor2={$SettingsMenuIndex !== 16}
+                        onclick={() => {
+                        $SettingsMenuIndex = 16
+                    }}>
+                        <BarChartIcon />
+                        <span>{language.statistics}</span>
+                    </button>
+                    <button class="flex gap-2 items-center hover:text-textcolor"
                         class:text-textcolor={$SettingsMenuIndex === 77}
                         class:text-textcolor2={$SettingsMenuIndex !== 77}
                         onclick={() => {
@@ -208,6 +218,8 @@
                         }}/>
                     {:else if $SettingsMenuIndex === 15 && window.innerWidth >= 768}
                         <HotkeySettings/>
+                    {:else if $SettingsMenuIndex === 16}
+                        <StatisticsPage/>
                     {:else if $SettingsMenuIndex === 77}
                         <ThanksPage/>
                     {/if}

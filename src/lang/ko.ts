@@ -441,9 +441,17 @@ export const languageKorean = {
         "v2SetLorebookAlwaysActiveDesc": "인덱스 {{index}} 의 로어북 언제나 활성화를 {{value}} 로 설정",
         "v2Calculate": "연산",
         "v2CalculateDesc": "{{expression}} 연산 => {{outputVar}}",
-        "v2ReplaceString": "문자열 치환",
         "v2ReplaceStringDesc": "{{source}} 에서 정규식 {{regex}} 를 {{replacement}} 로 치환 => {{outputVar}}"
     },
+    "statistics": "통계",
+    "general": "일반",
+    "totalMessages": "총 메시지",
+    "totalInputTokens": "총 입력 토큰",
+    "totalOutputTokens": "총 출력 토큰",
+    "totalTokens": "총 토큰",
+    "timeSpent": "사용 시간",
+    "modelUsage": "모델 사용량",
+    "botUsage": "봇 사용량",
     "triggerInputLabels": {
         "value": "값",
         "var": "변수",

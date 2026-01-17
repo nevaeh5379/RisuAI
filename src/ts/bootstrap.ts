@@ -43,6 +43,7 @@ import {
     checkCharOrder,
     setupDatabaseWatcher
 } from "./globalApi.svelte";
+import { startTimeTracking } from "./process/statistics";
 import { isTauri, isTauriMobile, isNodeServer } from "./platform";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
@@ -255,6 +256,7 @@ export async function loadData() {
                 })
             }
             await setupDatabaseWatcher()
+            startTimeTracking()
         } catch (error) {
             alertError(error)
         }

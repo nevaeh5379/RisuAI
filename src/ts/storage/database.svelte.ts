@@ -536,7 +536,13 @@ export function setDatabase(data: Database) {
     data.strictJsonSchema ??= true
     data.statics ??= {
         messages: 0,
-        imports: 0
+        imports: 0,
+        totalTime: 0,
+        modelUsage: {},
+        botUsage: {},
+        inputTokens: 0,
+        outputTokens: 0,
+        daily: {}
     }
     data.customQuotes ??= false
     data.customQuotesData ??= ['“', '”', '‘', '’']
@@ -1062,6 +1068,16 @@ export interface Database {
     statics: {
         messages: number
         imports: number
+        totalTime?: number
+        modelUsage?: { [key: string]: number }
+        botUsage?: { [key: string]: number }
+        inputTokens?: number
+        outputTokens?: number
+        daily?: { [key: string]: {
+            messages: number
+            inputTokens: number
+            outputTokens: number
+        } }
     }
     customQuotes: boolean
     customQuotesData?: [string, string, string, string]
