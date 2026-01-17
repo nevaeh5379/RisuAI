@@ -1141,6 +1141,25 @@
             <span class="ml-1">{language.disableAbove}</span>
         {/if}
     </button>
+
+    <button
+        class="flex items-center hover:text-blue-500 transition-colors"
+        onclick={async () => {
+            await sleep(1);
+            exportModalStore.set({
+                open: true,
+                startIndex: idx,
+                endIndex: idx,
+                initialIndex: idx,
+                chatId: getCurrentChat().id
+            });
+        }}
+    >
+        <Download size={20} />
+        {#if showNames}
+            <span class="ml-1">{language.exportLogs}</span>
+        {/if}
+    </button>
 {/snippet}
 
 {#snippet senderIcon(options: { rounded?: boolean; styleFix?: string } = {})}

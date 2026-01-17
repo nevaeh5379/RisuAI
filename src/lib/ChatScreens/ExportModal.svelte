@@ -1,7 +1,7 @@
 <script lang="ts">
     import { exportModalStore, DBState, selectedCharID } from "src/ts/stores.svelte";
     import { language } from "src/lang";
-    import { toPng } from 'html-to-image';
+    import { toBlob } from 'html-to-image';
     import { downloadFile } from "src/ts/globalApi.svelte";
     import Chat from "./Chat.svelte";
     import Button from "src/lib/UI/GUI/Button.svelte";
@@ -10,6 +10,8 @@
     import { XIcon, SettingsIcon, ListFilterIcon, ImageDownIcon, LayersIcon, PaletteIcon, ScanSearchIcon, MousePointerClickIcon, ChevronRightIcon, ChevronDownIcon, FolderIcon, FolderOpenIcon, SlidersIcon, EyeIcon } from "@lucide/svelte";
     import { createSimpleCharacter } from "src/ts/stores.svelte";
     import { tick } from "svelte";
+    import { sleep } from "src/ts/util";
+    import { mergePngs } from "./pngMerge";
 
     // --- Types ---
     type ClassNode = {
@@ -27,6 +29,7 @@
     // --- State ---
     let exportContainer = $state<HTMLElement>();
     let loading = $state(false);
+    let loadingMessage = $state('Processing...');
     let currentTab = $state<Tab>('settings');
 
     let char = $derived(DBState.db.characters?.[$selectedCharID]);
@@ -302,42 +305,103 @@
         }
     }
 
+    // import { mergePngs } from "./pngMerge"; // Removed in favor of worker
+
+    // ... (rest of imports)
+
     async function exportImage() {
         if (!exportContainer) return;
         loading = true;
+        loadingMessage = 'Preparing...';
         
         const currentInspectorMode = inspectorMode;
         inspectorMode = false;
         if (highlightedElement) highlightedElement.classList.remove('inspector-highlight');
 
-        try {
-            const dataUrl = await toPng(exportContainer, {
-                backgroundColor: '#1a1b1e', 
-                style: { transform: 'scale(1)' },
-                filter: (node) => {
-                    if (node instanceof Element) {
-                        if (node.classList.contains('inspector-hidden-target') || 
-                            node.classList.contains('auto-hidden-target')) {
-                            return false;
-                        }
-                    }
-                    return true;
+        const filter = (node: Node) => {
+            if (node instanceof Element) {
+                if (node.classList.contains('inspector-hidden-target') || 
+                    node.classList.contains('auto-hidden-target')) {
+                    return false;
                 }
-            });
-            
-            const base64 = dataUrl.split(',')[1];
-            const binaryString = window.atob(base64);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return true;
+        };
+
+        try {
+            const width = exportContainer.offsetWidth;
+            const height = exportContainer.scrollHeight;
+            const CHUNK_SIZE = 8000;
+            let finalBytes: Uint8Array;
+
+            if (height <= CHUNK_SIZE) {
+                loadingMessage = 'Capturing...';
+                await sleep(50);
+                const blob = await toBlob(exportContainer, {
+                    backgroundColor: '#1a1b1e', 
+                    style: { transform: 'scale(1)' },
+                    filter,
+                    cacheBust: false
+                });
+                if (!blob) throw new Error("Image capture failed");
+                finalBytes = new Uint8Array(await blob.arrayBuffer());
+            } else {
+                // Chunking strategy using binary merge
+                const chunkBytes: Uint8Array[] = [];
+                const totalChunks = Math.ceil(height / CHUNK_SIZE);
+                let currentChunk = 0;
+
+                for (let y = 0; y < height; y += CHUNK_SIZE) {
+                    currentChunk++;
+                    loadingMessage = `Capturing part ${currentChunk}/${totalChunks}...`;
+                    await sleep(100); // Allow UI to update
+
+                    const chunkHeight = Math.min(CHUNK_SIZE, height - y);
+                    const blob = await toBlob(exportContainer, {
+                        backgroundColor: '#1a1b1e',
+                        width: width,
+                        height: chunkHeight,
+                        style: {
+                            transform: `translateY(-${y}px) scale(1)`,
+                            height: `${height}px`,
+                        },
+                        filter,
+                        cacheBust: false
+                    });
+                    
+                    if (!blob) throw new Error("Chunk capture failed");
+                    const bytes = new Uint8Array(await blob.arrayBuffer());
+                    chunkBytes.push(bytes);
+                }
+
+                loadingMessage = 'Merging images... (This may take a while)';
+                await sleep(100);
+                
+                // Use Worker
+                const worker = new Worker(new URL('./pngMerge.worker.ts', import.meta.url), { type: 'module' });
+                finalBytes = await new Promise((resolve, reject) => {
+                    worker.onmessage = (e) => {
+                        if (e.data.error) reject(new Error(e.data.error));
+                        else resolve(e.data.result);
+                        worker.terminate();
+                    };
+                    worker.onerror = (err) => {
+                        reject(err);
+                        worker.terminate();
+                    };
+                    // Transfer buffers
+                    worker.postMessage({ chunks: chunkBytes }, chunkBytes.map(c => c.buffer));
+                });
             }
             
-            await downloadFile(`log-export-${Date.now()}.png`, bytes);
+            loadingMessage = 'Downloading...';
+            await downloadFile(`log-export-${Date.now()}.png`, finalBytes);
         } catch (error) {
             console.error('Export failed', error);
             alert('Export failed: ' + error);
         } finally {
             loading = false;
+            loadingMessage = 'Processing...';
             inspectorMode = currentInspectorMode;
         }
     }
@@ -553,7 +617,7 @@
             <div class="p-4 border-t border-darkborderc bg-darkbg mt-auto flex gap-2">
                 <Button styled="outlined" className="flex-1" onclick={close}>Cancel</Button>
                 <Button styled="primary" className="flex-[2]" onclick={exportImage} disabled={loading}>
-                    {loading ? 'Processing...' : 'Export PNG'}
+                    {loading ? loadingMessage : 'Export PNG'}
                 </Button>
             </div>
         </div>

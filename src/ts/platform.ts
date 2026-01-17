@@ -5,6 +5,7 @@ export const isNodeServer: boolean = !!(globalThis as typeof globalThis & { __NO
 export const isCapacitor: boolean = Capacitor.isNativePlatform(); // android & ios
 export const isWeb: boolean = !isTauri && !isNodeServer && location.hostname === 'risuai.xyz' && !isCapacitor;
 export const isMobile: boolean = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent);
+export const isTauriMobile: boolean = isTauri && isMobile; // Tauri running on Android/iOS - Window API not available
 
 export const isFirefox: boolean = navigator.userAgent.includes("Firefox")
 

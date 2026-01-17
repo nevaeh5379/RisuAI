@@ -42,7 +42,7 @@ import {
     setUsingSw,
     checkCharOrder
 } from "./globalApi.svelte";
-import { isTauri } from "./platform";
+import { isTauri, isTauriMobile } from "./platform";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -55,7 +55,9 @@ export async function loadData() {
         try {
             if (isTauri) {
                 LoadingStatusState.text = "Checking Files..."
-                appWindow.maximize()
+                if (!isTauriMobile) {
+                    appWindow.maximize()
+                }
                 if (!await exists('', { baseDir: BaseDirectory.AppData })) {
                     await mkdir('', { baseDir: BaseDirectory.AppData })
                 }

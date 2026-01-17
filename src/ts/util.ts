@@ -7,7 +7,7 @@ import { readFile } from "@tauri-apps/plugin-fs"
 import { basename } from "@tauri-apps/api/path"
 import { createBlankChar, getCharImage } from "./characters"
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { isIOS, isTauri } from "src/ts/platform"
+import { isIOS, isTauri, isTauriMobile } from "src/ts/platform"
 import type { Attachment } from "svelte/attachments"
 import { mount, unmount, type Snippet } from "svelte"
 import PopupList from "src/lib/UI/PopupList.svelte"
@@ -219,6 +219,10 @@ function readFileAsUint8Array(file: File) {
 }
 
 export async function changeFullscreen(){
+    // Skip fullscreen API on Tauri mobile - Window API not available
+    if (isTauriMobile || !appWindow) {
+        return
+    }
     const db = getDatabase()
     const isFull = await appWindow.isFullscreen()
     if(db.fullScreen && (!isFull)){
