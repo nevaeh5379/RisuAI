@@ -578,10 +578,12 @@ export async function requestChatDataMain(arg: requestDataArgument, model: Model
     targ.mode = model
     targ.extractJson = arg.extractJson ?? db.extractJson
     if (targ.aiModel === 'reverse_proxy') {
-        targ.modelInfo.internalID = db.customProxyRequestModel
-        targ.modelInfo.format = db.customAPIFormat
-        targ.customURL = db.forceReplaceUrl
-        targ.key = db.proxyKey
+        const index = targ.mode === 'model' ? db.selectedCustomAPI : db.selectedCustomAPISub
+        const customAPI = db.customAPIs?.[index]
+        targ.modelInfo.internalID = customAPI?.model ?? db.customProxyRequestModel
+        targ.modelInfo.format = customAPI?.format ?? db.customAPIFormat
+        targ.customURL = customAPI?.url ?? db.forceReplaceUrl
+        targ.key = customAPI?.key ?? db.proxyKey
     }
     if (targ.aiModel.startsWith('xcustom:::')) {
         const found = db.customModels.find(m => m.id === targ.aiModel)

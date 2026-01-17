@@ -14,6 +14,16 @@ import type { OobaChatCompletionRequestParams } from '../model/ooba';
 import { type HypaV3Settings, type HypaV3Preset, createHypaV3Preset } from '../process/memory/hypav3'
 import { isTauri, isNodeServer } from "src/ts/platform"
 
+export interface CustomAPIConfig {
+    name: string
+    url: string
+    key: string
+    model: string
+    format: number
+    tokenizer: string
+    additionalParams: string[][]
+}
+
 //APP_VERSION_POINT is to locate the app version in the database file for version bumping
 export let appVer = "2026.1.90" //<APP_VERSION_POINT>
 export let webAppSubVer = ''
@@ -602,7 +612,29 @@ export function setDatabase(data: Database) {
     }
     data.doNotChangeSeperateModels ??= false
     data.modelTools ??= []
+    data.doNotChangeSeperateModels ??= false
+    data.modelTools ??= []
     data.enableScrollToActiveChar ??= true
+
+    if (checkNullish(data.customAPIs)) {
+        data.customAPIs = [
+            {
+                name: "Custom API 1",
+                url: data.forceReplaceUrl || "",
+                key: data.proxyKey || "",
+                model: data.customProxyRequestModel || "",
+                format: data.customAPIFormat || 0,
+                tokenizer: data.customTokenizer || "tik",
+                additionalParams: data.additionalParams || []
+            }
+        ]
+    }
+    if (checkNullish(data.selectedCustomAPI)) {
+        data.selectedCustomAPI = 0
+    }
+    if (checkNullish(data.selectedCustomAPISub)) {
+        data.selectedCustomAPISub = 0
+    }
     
     // Merge existing hotkeys with new default hotkeys
     if (!data.hotkeys) {
@@ -1095,6 +1127,9 @@ export interface Database {
     vertexAccessToken: string
     vertexAccessTokenExpires: number
     vertexRegion: string
+    customAPIs: CustomAPIConfig[]
+    selectedCustomAPI: number
+    selectedCustomAPISub: number
     seperateParametersEnabled: boolean
     seperateParameters: {
         memory: SeparateParameters,

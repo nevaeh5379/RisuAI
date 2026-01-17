@@ -218,7 +218,8 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
     let requestModel = (aiModel === 'reverse_proxy' || aiModel === 'openrouter') ? db.proxyRequestModel : aiModel
     let openrouterRequestModel = db.openrouterRequestModel
     if(aiModel === 'reverse_proxy'){
-        requestModel = db.customProxyRequestModel
+        const index = arg.mode === 'model' ? db.selectedCustomAPI : db.selectedCustomAPISub
+        requestModel = db.customAPIs?.[index]?.model ?? db.customProxyRequestModel
     }
 
     if(aiModel === 'openrouter' && db.openrouterRequestModel === 'risu/free'){
@@ -484,7 +485,7 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
             aiModel.startsWith('gpt') || 
             (aiModel == 'reverse_proxy' && (
                 db.proxyRequestModel?.startsWith('gpt') ||
-                (db.proxyRequestModel === 'custom' && db.customProxyRequestModel.startsWith('gpt'))
+                (db.proxyRequestModel === 'custom' && (db.customAPIs?.[arg.mode === 'model' ? db.selectedCustomAPI : db.selectedCustomAPISub]?.model ?? db.customProxyRequestModel).startsWith('gpt'))
             )))){
             delete body.logit_bias
         }
@@ -613,7 +614,10 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
     }
 
     if(aiModel === 'reverse_proxy' || aiModel.startsWith('xcustom:::')){
-        let additionalParams = aiModel === 'reverse_proxy' ? db.additionalParams : []
+        const index = arg.mode === 'model' ? db.selectedCustomAPI : db.selectedCustomAPISub
+        let additionalParams = aiModel === 'reverse_proxy' 
+            ? (db.customAPIs?.[index]?.additionalParams ?? db.additionalParams) 
+            : []
 
         if(aiModel.startsWith('xcustom:::')){
             const found = db.customModels.find(m => m.id === aiModel)

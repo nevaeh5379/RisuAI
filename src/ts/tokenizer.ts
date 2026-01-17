@@ -74,12 +74,16 @@ export async function encode(data:string):Promise<(number[]|Uint32Array|Int32Arr
     const modelInfo = getModelInfo(db.aiModel);
     const pluginTokenizer = pluginV2.providerOptions.get(db.currentPluginProvider)?.tokenizer ?? "none";
 
+    const tokenizerSetting = db.aiModel === 'reverse_proxy' 
+        ? (db.customAPIs?.[db.selectedCustomAPI]?.tokenizer ?? "tik")
+        : db.customTokenizer;
+
     let cacheKey = ''
     if(db.useTokenizerCaching){
         cacheKey = getHash(
             data,
             db.aiModel,
-            db.customTokenizer,
+            tokenizerSetting,
             db.currentPluginProvider,
             db.googleClaudeTokenizing,
             modelInfo,
@@ -94,7 +98,7 @@ export async function encode(data:string):Promise<(number[]|Uint32Array|Int32Arr
     let result: number[] | Uint32Array | Int32Array;
 
     if(db.aiModel === 'openrouter' || db.aiModel === 'reverse_proxy'){
-        switch(db.customTokenizer){
+        switch(tokenizerSetting){
             case 'mistral':
                 result = await tokenizeWebTokenizers(data, 'mistral'); break;
             case 'llama':

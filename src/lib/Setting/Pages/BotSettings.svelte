@@ -39,6 +39,8 @@ let tokens = $state({
         jailbreak: 0,
         globalNote: 0,
     })
+    
+    let editingApiIndex = $state(0)
 
     interface Props {
         goPromptTemplate?: any;
@@ -163,35 +165,184 @@ let tokens = $state({
         <TextInput bind:value={DBState.db.novelai.token}/>
     {/if}
     {#if DBState.db.aiModel === 'reverse_proxy' || DBState.db.subModel === 'reverse_proxy'}
-        <span class="text-textcolor mt-2">URL <Help key="forceUrl"/></span>
-        <TextInput marginBottom={false} size={"sm"} bind:value={DBState.db.forceReplaceUrl} placeholder="https//..." />
-        <span class="text-textcolor mt-4"> {language.proxyAPIKey}</span>
-        <TextInput hideText={DBState.db.hideApiKey} marginBottom={false} size={"sm"} placeholder="leave it blank if it hasn't password" bind:value={DBState.db.proxyKey} />
-        <span class="text-textcolor mt-4"> {language.proxyRequestModel}</span>
-        <TextInput marginBottom={false} size={"sm"} bind:value={DBState.db.customProxyRequestModel} placeholder="Name" />
-        <span class="text-textcolor mt-4"> {language.format}</span>
-        <SelectInput value={DBState.db.customAPIFormat.toString()} onchange={(e) => {
-            DBState.db.customAPIFormat = parseInt(e.currentTarget.value)
-        }}>
-            <OptionInput value={LLMFormat.OpenAICompatible.toString()}>
-                OpenAI Compatible
-            </OptionInput>
-            <OptionInput value={LLMFormat.OpenAIResponseAPI.toString()}>
-                OpenAI Response API
-            </OptionInput>
-            <OptionInput value={LLMFormat.Anthropic.toString()}>
-                Anthropic Claude
-            </OptionInput>
-            <OptionInput value={LLMFormat.Mistral.toString()}>
-                Mistral
-            </OptionInput>
-            <OptionInput value={LLMFormat.GoogleCloud.toString()}>
-                Google Cloud
-            </OptionInput>
-            <OptionInput value={LLMFormat.Cohere.toString()}>
-                Cohere
-            </OptionInput>
-        </SelectInput>
+        {#if !DBState.db.customAPIs} 
+            {(() => {
+                if (!DBState.db.customAPIs) {
+                    DBState.db.customAPIs = [
+                        {
+                            name: "Custom API 1",
+                            url: DBState.db.forceReplaceUrl || "",
+                            key: DBState.db.proxyKey || "",
+                            model: DBState.db.customProxyRequestModel || "",
+                            format: DBState.db.customAPIFormat || 0,
+                            tokenizer: DBState.db.customTokenizer || "tik",
+                            additionalParams: DBState.db.additionalParams || []
+                        }
+                    ]
+                    DBState.db.selectedCustomAPI = 0
+                }
+                return ""
+            })()}
+        {/if}
+
+        {#if DBState.db.aiModel === 'reverse_proxy'}
+            <div class="flex items-center gap-2 mt-2">
+                <span class="text-textcolor">Main Model Custom API Profile</span>
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+                <SelectInput className="flex-1" value={DBState.db.selectedCustomAPI?.toString() || "0"} onchange={(e) => {
+                    DBState.db.selectedCustomAPI = parseInt(e.currentTarget.value)
+                }}>
+                    {#each DBState.db.customAPIs as api, i}
+                        <OptionInput value={i.toString()}>{api.name}</OptionInput>
+                    {/each}
+                </SelectInput>
+            </div>
+        {/if}
+
+        {#if DBState.db.subModel === 'reverse_proxy'}
+            <div class="flex items-center gap-2 mt-2">
+                <span class="text-textcolor">Sub Model Custom API Profile</span>
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+                <SelectInput className="flex-1" value={DBState.db.selectedCustomAPISub?.toString() || "0"} onchange={(e) => {
+                    DBState.db.selectedCustomAPISub = parseInt(e.currentTarget.value)
+                }}>
+                    {#each DBState.db.customAPIs as api, i}
+                        <OptionInput value={i.toString()}>{api.name}</OptionInput>
+                    {/each}
+                </SelectInput>
+            </div>
+        {/if}
+
+        <Accordion styled name="Manage Profiles" help="manageCustomProfiles">
+            <div class="flex items-center gap-2 mt-2">
+                <span class="text-textcolor">Profile to Edit</span>
+            </div>
+            <div class="flex items-center gap-2 mb-4">
+                <SelectInput className="flex-1" value={editingApiIndex.toString()} onchange={(e) => {
+                    editingApiIndex = parseInt(e.currentTarget.value)
+                }}>
+                    {#each DBState.db.customAPIs as api, i}
+                        <OptionInput value={i.toString()}>{api.name}</OptionInput>
+                    {/each}
+                </SelectInput>
+                <button class="p-2 text-textcolor bg-darkbutton rounded-md hover:bg-darkbutton2" onclick={() => {
+                    DBState.db.customAPIs.push({
+                        name: `Custom API ${DBState.db.customAPIs.length + 1}`,
+                        url: "",
+                        key: "",
+                        model: "",
+                        format: 0,
+                        tokenizer: "tik",
+                        additionalParams: []
+                    })
+                    editingApiIndex = DBState.db.customAPIs.length - 1
+                }}>
+                    <PlusIcon size={20} />
+                </button>
+                {#if DBState.db.customAPIs.length > 1}
+                    <button class="p-2 text-textcolor bg-darkbutton rounded-md hover:bg-darkbutton2" onclick={() => {
+                        DBState.db.customAPIs.splice(editingApiIndex, 1)
+                        if (editingApiIndex >= DBState.db.customAPIs.length) {
+                            editingApiIndex = Math.max(0, DBState.db.customAPIs.length - 1)
+                        }
+                        // Also validate main/sub selections to avoid OOB
+                        if (DBState.db.selectedCustomAPI >= DBState.db.customAPIs.length) {
+                            DBState.db.selectedCustomAPI = 0
+                        }
+                        if (DBState.db.selectedCustomAPISub >= DBState.db.customAPIs.length) {
+                            DBState.db.selectedCustomAPISub = 0
+                        }
+                    }}>
+                        <TrashIcon size={20} />
+                    </button>
+                {/if}
+            </div>
+
+            <span class="text-textcolor">Profile Name</span>
+            <TextInput marginBottom={true} size={"sm"} bind:value={DBState.db.customAPIs[editingApiIndex].name} />
+
+            <span class="text-textcolor mt-2">URL <Help key="forceUrl"/></span>
+            <TextInput marginBottom={false} size={"sm"} bind:value={DBState.db.customAPIs[editingApiIndex].url} placeholder="https//..." />
+            <span class="text-textcolor mt-4"> {language.proxyAPIKey}</span>
+            <TextInput hideText={DBState.db.hideApiKey} marginBottom={false} size={"sm"} placeholder="leave it blank if it hasn't password" bind:value={DBState.db.customAPIs[editingApiIndex].key} />
+            <span class="text-textcolor mt-4"> {language.proxyRequestModel}</span>
+            <TextInput marginBottom={false} size={"sm"} bind:value={DBState.db.customAPIs[editingApiIndex].model} placeholder="Name" />
+            <span class="text-textcolor mt-4"> {language.format}</span>
+            <SelectInput value={DBState.db.customAPIs[editingApiIndex].format.toString()} onchange={(e) => {
+                DBState.db.customAPIs[editingApiIndex].format = parseInt(e.currentTarget.value)
+            }}>
+                <OptionInput value={LLMFormat.OpenAICompatible.toString()}>
+                    OpenAI Compatible
+                </OptionInput>
+                <OptionInput value={LLMFormat.OpenAIResponseAPI.toString()}>
+                    OpenAI Response API
+                </OptionInput>
+                <OptionInput value={LLMFormat.Anthropic.toString()}>
+                    Anthropic Claude
+                </OptionInput>
+                <OptionInput value={LLMFormat.Mistral.toString()}>
+                    Mistral
+                </OptionInput>
+                <OptionInput value={LLMFormat.GoogleCloud.toString()}>
+                    Google Cloud
+                </OptionInput>
+                <OptionInput value={LLMFormat.Cohere.toString()}>
+                    Cohere
+                </OptionInput>
+            </SelectInput>
+
+            <span class="text-textcolor mt-4"> {language.tokenizer}</span>
+            <SelectInput value={DBState.db.customAPIs[editingApiIndex].tokenizer} onchange={(e) => {
+                DBState.db.customAPIs[editingApiIndex].tokenizer = e.currentTarget.value
+            }}>
+                {#each tokenizerList as entry}
+                    <OptionInput value={entry[0]}>{entry[1]}</OptionInput>
+                {/each}
+            </SelectInput>
+
+            <div class="mt-4">
+                <span class="text-textcolor">{language.additionalParams}</span>
+                <table class="contain w-full max-w-full tabler mt-2">
+                    <tbody>
+                    <tr>
+                        <th class="font-medium">{language.key}</th>
+                        <th class="font-medium">{language.value}</th>
+                        <th>
+                            <button class="font-medium cursor-pointer hover:text-green-500 w-full flex justify-center items-center" onclick={() => {
+                                let additionalParams = DBState.db.customAPIs[editingApiIndex].additionalParams
+                                additionalParams.push(['', ''])
+                                DBState.db.customAPIs[editingApiIndex].additionalParams = additionalParams
+                            }}><PlusIcon /></button>
+                        </th>
+                    </tr>
+                    {#if DBState.db.customAPIs[editingApiIndex].additionalParams.length === 0}
+                        <tr class="text-textcolor2">
+                            <td colspan="3">{language.noData}</td>
+                        </tr>
+                    {/if}
+                    {#each DBState.db.customAPIs[editingApiIndex].additionalParams as additionalParams, i}
+                        <tr>
+                            <td class="font-medium truncate">
+                                <TextInput bind:value={DBState.db.customAPIs[editingApiIndex].additionalParams[i][0]} size="lg" fullwidth/>
+                            </td>
+                            <td class="font-medium truncate">
+                                <TextInput bind:value={DBState.db.customAPIs[editingApiIndex].additionalParams[i][1]} size="lg" fullwidth/>
+                            </td>
+                            <td>
+                                <button class="font-medium flex justify-center items-center h-full cursor-pointer hover:text-green-500 w-full" onclick={() => {
+                                    let additionalParams = DBState.db.customAPIs[editingApiIndex].additionalParams
+                                    additionalParams.splice(i, 1)
+                                    DBState.db.customAPIs[editingApiIndex].additionalParams = additionalParams
+                                }}><TrashIcon /></button>
+                            </td>
+                        </tr>
+                    {/each}
+                    </tbody>
+                </table>
+            </div>
+        </Accordion>
     {/if}
     {#if modelInfo.provider === LLMProvider.Cohere || subModelInfo.provider === LLMProvider.Cohere}
         <span class="text-textcolor mt-4">Cohere {language.apiKey}</span>
@@ -248,9 +399,12 @@ let tokens = $state({
             </SelectInput>
         {/await}
     {/if}
-    {#if DBState.db.aiModel === 'openrouter' || DBState.db.aiModel === 'reverse_proxy'}
+    {#if DBState.db.aiModel === 'openrouter'}
         <span class="text-textcolor">{language.tokenizer}</span>
-        <SelectInput bind:value={DBState.db.customTokenizer}>
+        <SelectInput value={DBState.db.customTokenizer} 
+        onchange={(e) => {
+            DBState.db.customTokenizer = e.currentTarget.value
+        }}>
             {#each tokenizerList as entry}
                 <OptionInput value={entry[0]}>{entry[1]}</OptionInput>
             {/each}
@@ -529,47 +683,7 @@ let tokens = $state({
         </div>
     </Accordion>
 
-    {#if DBState.db.aiModel === 'reverse_proxy'}
-    <Accordion styled name="{language.additionalParams} " help="additionalParams">
-        <table class="contain w-full max-w-full tabler">
-            <tbody>
-            <tr>
-                <th class="font-medium">{language.key}</th>
-                <th class="font-medium">{language.value}</th>
-                <th>
-                    <button class="font-medium cursor-pointer hover:text-green-500 w-full flex justify-center items-center" onclick={() => {
-                        let additionalParams = DBState.db.additionalParams
-                        additionalParams.push(['', ''])
-                        DBState.db.additionalParams = additionalParams
-                    }}><PlusIcon /></button>
-                </th>
-            </tr>
-            {#if DBState.db.bias.length === 0}
-                <tr class="text-textcolor2">
-                    <td colspan="3">{language.noData}</td>
-                </tr>
-            {/if}
-            {#each DBState.db.additionalParams as additionalParams, i}
-                <tr>
-                    <td class="font-medium truncate">
-                        <TextInput bind:value={DBState.db.additionalParams[i][0]} size="lg" fullwidth/>
-                    </td>
-                    <td class="font-medium truncate">
-                        <TextInput bind:value={DBState.db.additionalParams[i][1]} size="lg" fullwidth/>
-                    </td>
-                    <td>
-                        <button class="font-medium flex justify-center items-center h-full cursor-pointer hover:text-green-500 w-full" onclick={() => {
-                            let additionalParams = DBState.db.additionalParams
-                            additionalParams.splice(i, 1)
-                            DBState.db.additionalParams = additionalParams
-                        }}><TrashIcon /></button>
-                    </td>
-                </tr>
-            {/each}
-            </tbody>
-        </table>
-    </Accordion>
-    {/if}
+
 
 
     <Accordion styled name={language.promptTemplate}>
