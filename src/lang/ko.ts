@@ -30,6 +30,7 @@ export const languageKorean = {
         "requestLogRemovedDesc": "요청 로그는 앱이 재시작되거나 새로고침되면 삭제됩니다.",
         "vertexAuthError": "Vertex AI 인증 정보가 누락되었습니다."
     },
+    "externalDataChange": "외부에서 데이터가 변경되었습니다. 새로고침합니다...",
     "showHelp": "도움말 보기",
     "help": {
         "model": "채팅에서 사용되는 모델입니다.",

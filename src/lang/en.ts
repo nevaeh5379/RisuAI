@@ -40,6 +40,7 @@ export const languageEnglish = {
         requestLogRemoved: "This request log is removed.",
         requestLogRemovedDesc: "This request log removes when client is refreshed or reloaded.",
     },
+    externalDataChange: "Database file changed externally, reloading...",
     showHelp: "Show Help",
     help: {
         model: "Model option is a main model used in chat.",

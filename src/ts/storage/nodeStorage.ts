@@ -5,7 +5,7 @@ let auth:string = null
 let authChecked = false
 
 export class NodeStorage{
-    async setItem(key:string, value:Uint8Array) {
+    async setItem(key:string, value:Uint8Array):Promise<number> {
         await this.checkAuth()
         const da = await fetch('/api/write', {
             method: "POST",
@@ -23,6 +23,7 @@ export class NodeStorage{
         if(data.error){
             throw data.error
         }
+        return data.mtime;
     }
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()

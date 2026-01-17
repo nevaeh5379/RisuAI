@@ -40,9 +40,10 @@ import {
     getUnpargeables,
     getBasename,
     setUsingSw,
-    checkCharOrder
+    checkCharOrder,
+    setupDatabaseWatcher
 } from "./globalApi.svelte";
-import { isTauri, isTauriMobile } from "./platform";
+import { isTauri, isTauriMobile, isNodeServer } from "./platform";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -253,6 +254,7 @@ export async function loadData() {
                     }
                 })
             }
+            await setupDatabaseWatcher()
         } catch (error) {
             alertError(error)
         }

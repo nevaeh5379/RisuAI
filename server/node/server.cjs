@@ -412,6 +412,43 @@ app.get('/api/read', async (req, res, next) => {
     }
 });
 
+app.get('/api/meta', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    const filePath = req.headers['file-path'];
+    if (!filePath) {
+        res.status(400).send({
+            error:'File path required'
+        });
+        return;
+    }
+
+    if(!isHex(filePath)){
+        res.status(400).send({
+            error:'Invaild Path'
+        });
+        return;
+    }
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ mtime: 0 }); 
+        }
+        else{
+            const stats = await fs.stat(fullPath);
+            res.send({
+                mtime: stats.mtimeMs
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
 app.get('/api/remove', async (req, res, next) => {
     if(req.headers['risu-auth'].trim() !== password.trim()){
         console.log('incorrect')
@@ -490,8 +527,10 @@ app.post('/api/write', async (req, res, next) => {
 
     try {
         await fs.writeFile(path.join(savePath, filePath), fileContent);
+        const stats = await fs.stat(path.join(savePath, filePath));
         res.send({
-            success: true
+            success: true,
+            mtime: stats.mtimeMs
         });
     } catch (error) {
         next(error);

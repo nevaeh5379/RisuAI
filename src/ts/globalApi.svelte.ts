@@ -5,7 +5,8 @@ import {
     exists,
     mkdir,
     readDir,
-    remove
+    remove,
+    watch
 } from "@tauri-apps/plugin-fs"
 import { changeFullscreen, checkNullish, sleep } from "./util"
 import { convertFileSrc, invoke } from "@tauri-apps/api/core"
@@ -47,6 +48,7 @@ import { makeColdData } from "./process/coldstorage.svelte";
 import { isTauri, isNodeServer, isCapacitor, isInStandaloneMode } from "./platform";
 
 export const forageStorage = new AutoStorage()
+let lastMtime = 0;
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -363,12 +365,18 @@ export async function saveDb() {
 
         const debounceTime = 500; // 500 milliseconds
         let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+        
+        let ignoreInitial = true;
+        setTimeout(() => {
+            ignoreInitial = false;
+        }, 1000);
 
         selectedCharID.subscribe((v) => {
             selIdState = v
         })
 
         function saveTimeoutExecute() {
+            if (ignoreInitial) return;
             if (saveTimeout) {
                 clearTimeout(saveTimeout);
             }
@@ -468,8 +476,12 @@ export async function saveDb() {
                 await writeFile(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData, { baseDir: BaseDirectory.AppData });
             }
             else {
+                 const res = await forageStorage.setItem('database/database.bin', dbData)
+                 if (typeof res === 'number') {
+                     lastMtime = res;
+                     console.log("Updated lastMtime after save:", lastMtime);
+                 }
 
-                await forageStorage.setItem('database/database.bin', dbData)
                 if (!forageStorage.isAccount) {
                     await forageStorage.setItem(`database/dbbackup-${(Date.now() / 100).toFixed()}.bin`, dbData)
                 }
@@ -2191,4 +2203,81 @@ export function createChatCopyName(originalName: string,type:'Copy'|'Branch'): s
         newName = `${name} (${type} ${copyIndex})`
     }
     return newName
+}
+
+let watcherSetup = false;
+export async function setupDatabaseWatcher() {
+    if (watcherSetup) return;
+    watcherSetup = true;
+
+    if (isTauri) {
+        try {
+            await watch(
+                'database/database.bin',
+                async (event) => {
+                    if (saving.state) return;
+
+                    console.log('Database file changed externally, reloading...');
+                    await sleep(500); 
+                    
+                    if(saving.state) return;
+
+                    alertNormalWait(language.externalDataChange).then(() => {
+                        location.reload();
+                    });
+                },
+                { baseDir: BaseDirectory.AppData }
+            );
+            console.log('Database watcher setup complete');
+        } catch (error) {
+            console.error('Failed to setup database watcher:', error);
+        }
+    } else if (isNodeServer) {
+        console.log('Database watcher setup complete (Node/Polling)');
+        
+        const check = async () => {
+             if (saving.state) return;
+             try {
+                const auth = localStorage.getItem('risuauth') || '';
+                const pathStr = 'database/database.bin';
+                const encoder = new TextEncoder();
+                const data = encoder.encode(pathStr);
+                let hexPath = '';
+                for (const byte of data) {
+                    hexPath += byte.toString(16).padStart(2, '0');
+                }
+
+                const res = await fetch('/api/meta', {
+                    headers: {
+                        'risu-auth': auth,
+                        'file-path': hexPath
+                    }
+                });
+                
+                if(res.ok){
+                    const data = await res.json();
+                    if(data.mtime && data.mtime > 0){
+                        if(lastMtime === 0) {
+                            lastMtime = data.mtime;
+                            console.log("Initial mtime:", lastMtime);
+                        } else if (data.mtime > lastMtime) {
+                            console.log('External change detected (Node Polling)', data.mtime, lastMtime);
+                            lastMtime = data.mtime;
+                            if(saving.state) return;
+                            alertNormalWait(language.externalDataChange).then(() => {
+                                location.reload();
+                            });
+                        }
+                    }
+                } else {
+                    console.log("Polling failed", res.status)
+                }
+             } catch(e) {
+                 console.log("Polling Error", e)
+             }
+        }
+        
+        await check(); 
+        setInterval(check, 2000);
+    }
 }

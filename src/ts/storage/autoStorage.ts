@@ -15,10 +15,13 @@ export class AutoStorage{
 
     realStorage:LocalForage|NodeStorage|OpfsStorage|AccountStorage|MobileStorage
 
-    async setItem(key:string, value:Uint8Array):Promise<string|null> {
+    async setItem(key:string, value:Uint8Array):Promise<string|number|null> {
         await this.Init()
         if(this.isAccount){
             return await (this.realStorage as AccountStorage).setItem(key, value)
+        }
+        if (this.realStorage instanceof NodeStorage) {
+             return await (this.realStorage as NodeStorage).setItem(key, value)
         }
         await this.realStorage.setItem(key, value)
         return null
