@@ -12,6 +12,7 @@
     import SideBarArrow from "../UI/GUI/SideBarArrow.svelte";
     import VisualNovelMain from "../VisualNovel/VisualNovelMain.svelte";
     import ModuleChatMenu from "../Setting/Pages/Module/ModuleChatMenu.svelte";
+    import RangeSelectionBar from "../UI/RangeSelectionBar.svelte";
     let openChatList = $state(false)
     let openModuleList = $state(false)
 
@@ -88,6 +89,8 @@
     <ModuleChatMenu close={() => {openModuleList = false}}/>
 {/if}
 
+<!-- Range Selection Mode Bar -->
+<RangeSelectionBar />
 <style>
     .halfw{
         max-width: calc(50% - 5rem);
@@ -97,5 +100,28 @@
     }
     .per33{
         height: 33.333333%;
+    }
+
+    /* Range Selection Mode Styles */
+    :global(.range-selection-active) {
+        cursor: pointer !important;
+    }
+
+    :global(.range-selected) {
+        background: linear-gradient(90deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%) !important;
+        border-left: 3px solid #8b5cf6 !important;
+        transition: all 0.15s ease;
+    }
+
+    :global(.range-start) {
+        border-top: 2px dashed rgba(139, 92, 246, 0.5) !important;
+    }
+
+    :global(.range-end) {
+        border-bottom: 2px dashed rgba(139, 92, 246, 0.5) !important;
+    }
+
+    :global(.range-selection-active:hover) {
+        background: rgba(139, 92, 246, 0.1) !important;
     }
 </style>

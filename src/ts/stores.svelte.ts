@@ -71,6 +71,15 @@ export const exportModalStore = writable({
     endIndex: 0,
     initialIndex: 0
 })
+
+// Range selection mode for export
+export const rangeSelectionStore = $state({
+    active: false,
+    startIndex: -1,
+    endIndex: -1,
+    chatId: ''
+})
+
 export const selIdState = $state({
     selId: -1
 })

@@ -75,12 +75,19 @@
     import AutoresizeArea from "../UI/GUI/TextAreaResizable.svelte";
     import ChatBody from "./ChatBody.svelte";
     import PopupButton from "../UI/PopupButton.svelte";
+    import MessageContextMenu from "../UI/MessageContextMenu.svelte";
+    import { rangeSelectionStore } from "src/ts/stores.svelte";
 
     let translating = $state(false);
     let editMode = $state(false);
     let statusMessage: string = $state("");
     let retranslate = $state(false);
     let bodyRoot: HTMLElement | null = $state(null);
+    
+    // Context menu state
+    let contextMenuOpen = $state(false);
+    let contextMenuX = $state(0);
+    let contextMenuY = $state(0);
     interface Props {
         message?: string;
         name?: string;
@@ -177,6 +184,97 @@
             DBState.db.characters[selIdState.selId].chatPage
         ].message[idx].data = message;
     }
+
+    // Context menu handlers
+    function openContextMenu(e: MouseEvent | TouchEvent) {
+        if (idx < 0) return;
+        e.preventDefault();
+        
+        if ('touches' in e) {
+            const touch = e.touches[0] || e.changedTouches[0];
+            contextMenuX = touch.clientX;
+            contextMenuY = touch.clientY;
+        } else {
+            contextMenuX = e.clientX;
+            contextMenuY = e.clientY;
+        }
+        contextMenuOpen = true;
+    }
+
+    function handleContextMenuCopy() {
+        const msgDisplay = message.replace(/<[^>]*>/g, '');
+        navigator.clipboard.writeText(msgDisplay);
+    }
+
+    function handleContextMenuEdit() {
+        editMode = true;
+    }
+
+    function handleContextMenuBranch() {
+        const currentChat = DBState.db.characters[selIdState.selId].chats[
+            DBState.db.characters[selIdState.selId].chatPage
+        ];
+        
+        const currentMessage = currentChat.message[idx];
+        const newChat = $state.snapshot(currentChat);
+        newChat.name = createChatCopyName(newChat.name, "Branch");
+        newChat.id = v4();
+        newChat.message = newChat.message.slice(0, idx + 1);
+        newChat.message.push({
+            role: "char",
+            data: "{{specialcomment::branchedfrom::" + currentChat.id + "::" + currentChat.name + "::" + currentMessage.chatId + "::}}",
+            isComment: true,
+            disabled: true,
+            chatId: v4(),
+        });
+        
+        DBState.db.characters[selIdState.selId].chats.unshift(newChat);
+        changeChatTo(0);
+    }
+
+    function handleContextMenuDisable() {
+        const currentMessage = DBState.db.characters[selIdState.selId].chats[
+            DBState.db.characters[selIdState.selId].chatPage
+        ].message[idx];
+        DBState.db.characters[selIdState.selId].chats[
+            DBState.db.characters[selIdState.selId].chatPage
+        ].message[idx].disabled = !currentMessage.disabled;
+    }
+
+    function handleContextMenuDisableAbove() {
+        const currentMessage = DBState.db.characters[selIdState.selId].chats[
+            DBState.db.characters[selIdState.selId].chatPage
+        ].message[idx];
+        DBState.db.characters[selIdState.selId].chats[
+            DBState.db.characters[selIdState.selId].chatPage
+        ].message[idx].disabled = currentMessage.disabled === "allBefore" ? false : "allBefore";
+    }
+
+    // Handle click when range selection mode is active
+    function handleRangeSelectionClick() {
+        if (!rangeSelectionStore.active || idx < 0) return;
+        
+        // Set the end index
+        rangeSelectionStore.endIndex = idx;
+    }
+
+    // Check if this message is in the selected range
+    let isInSelectedRange = $derived.by(() => {
+        if (!rangeSelectionStore.active) return false;
+        if (rangeSelectionStore.startIndex < 0) return false;
+        
+        const start = Math.min(rangeSelectionStore.startIndex, rangeSelectionStore.endIndex);
+        const end = Math.max(rangeSelectionStore.startIndex, rangeSelectionStore.endIndex);
+        
+        if (rangeSelectionStore.endIndex >= 0) {
+            return idx >= start && idx <= end;
+        }
+        
+        return idx === rangeSelectionStore.startIndex;
+    });
+
+    let isRangeStart = $derived(rangeSelectionStore.active && idx === rangeSelectionStore.startIndex);
+    let isRangeEnd = $derived(rangeSelectionStore.active && rangeSelectionStore.endIndex >= 0 && idx === rangeSelectionStore.endIndex);
 
     function getCbsCondition() {
         try {
@@ -1444,8 +1542,27 @@
 {#if disabled === true}
     <div class="w-full border-t-2 border-dashed border-blue-500"></div>
 {/if}
+
+<!-- Context Menu -->
+<MessageContextMenu
+    bind:open={contextMenuOpen}
+    x={contextMenuX}
+    y={contextMenuY}
+    messageIdx={idx}
+    onCopy={handleContextMenuCopy}
+    onEdit={handleContextMenuEdit}
+    onBranch={handleContextMenuBranch}
+    onDisable={handleContextMenuDisable}
+    onDisableAbove={handleContextMenuDisableAbove}
+/>
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
     class="flex max-w-full justify-center risu-chat"
+    class:range-selection-active={rangeSelectionStore.active}
+    class:range-selected={isInSelectedRange}
+    class:range-start={isRangeStart}
+    class:range-end={isRangeEnd}
     data-chat-index={idx}
     data-chat-id={DBState.db.characters?.[selIdState.selId]?.chats?.[
         DBState.db.characters?.[selIdState.selId]?.chatPage
@@ -1453,7 +1570,16 @@
     style={isLastMemory
         ? `border-top:${DBState.db.memoryLimitThickness}px solid rgba(98, 114, 164, 0.7);`
         : ""}
-    onclickcapture={handleButtonTriggerWithin}
+    onclickcapture={(e) => {
+        if (rangeSelectionStore.active) {
+            handleRangeSelectionClick();
+            e.stopPropagation();
+        } else {
+            handleButtonTriggerWithin(e);
+        }
+    }}
+    oncontextmenu={openContextMenu}
+    use:longpress={openContextMenu}
 >
     <div
         class="text-textcolor mt-1 ml-4 mr-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full"
