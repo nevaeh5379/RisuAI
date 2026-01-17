@@ -649,6 +649,8 @@ export const languageEnglish = {
     temperature: "Temperature",
     frequencyPenalty: "Frequency Penalty",
     presensePenalty: "Presense Penalty",
+    localBackupMethod: "Local Backup Method",
+    localRestoreMethod: "Local Restore Method",
     advancedSettings: "Advanced Settings",
     advancedSettingsWarn: "Warn: If you don't know what the option does, don't change it!",
     formatingOrder: "Formating Order",

@@ -110,6 +110,26 @@ export const advancedSettingsItems: SettingItem[] = [
     { id: 'adv.noWaitTrans', type: 'check', labelKey: 'noWaitForTranslate', bindKey: 'noWaitForTranslate', classes: 'mt-4' },
     { id: 'adv.newImgBeta', type: 'check', labelKey: 'newImageHandlingBeta', bindKey: 'newImageHandlingBeta', classes: 'mt-4' },
     { id: 'adv.allowExt', type: 'check', fallbackLabel: 'Allow all in file select', bindKey: 'allowAllExtentionFiles', classes: 'mt-4' },
+    {
+        id: 'adv.localBackupMethod', type: 'select', labelKey: 'localBackupMethod', fallbackLabel: 'Local Backup Method', bindKey: 'localBackupMethod',
+        options: {
+            selectOptions: [
+                { value: 'fast', label: 'Fast (Recommended)' },
+                { value: 'compatible', label: 'Compatible (Slow, Legacy)' }
+            ]
+        },
+        classes: 'mt-4'
+    },
+    {
+        id: 'adv.localRestoreMethod', type: 'select', labelKey: 'localRestoreMethod', fallbackLabel: 'Local Restore Method', bindKey: 'localRestoreMethod',
+        options: {
+            selectOptions: [
+                { value: 'fast', label: 'Fast (Recommended)' },
+                { value: 'compatible', label: 'Compatible (Slow, Legacy)' }
+            ]
+        },
+        classes: 'mt-4'
+    },
 
     // Experimental Section (visible when useExperimental is true)
     {

@@ -146,6 +146,12 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.timeOut)) {
         data.timeOut = 120
     }
+    if (checkNullish(data.localBackupMethod)) {
+        data.localBackupMethod = 'fast'
+    }
+    if (checkNullish(data.localRestoreMethod)) {
+        data.localRestoreMethod = 'fast'
+    }
     if (checkNullish(data.waifuWidth)) {
         data.waifuWidth = 100
     }
@@ -794,6 +800,7 @@ export interface Database {
     zoomsize: number
     lastup: string
     customBackground: string
+    localBackupMethod: 'fast' | 'compatible'
     textgenWebUIStreamURL: string
     textgenWebUIBlockingURL: string
     autoTranslate: boolean
