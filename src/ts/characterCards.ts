@@ -13,7 +13,7 @@ import { type CharacterCardV3, type LorebookEntry } from '@risuai/ccardlib'
 import { reencodeImage } from "./process/files/inlays"
 import { PngChunk } from "./pngChunk"
 import type { OnnxModelFiles } from "./process/transformers"
-import { CharXReader, CharXSkippableChecker, CharXWriter } from "./process/processzip"
+import { CharXImporter, CharXSkippableChecker, CharXWriter } from "./process/processzip"
 import { exportModule, readModule, type RisuModule } from "./process/modules"
 import { readFile } from "@tauri-apps/plugin-fs"
 import { onOpenUrl } from '@tauri-apps/plugin-deep-link';
@@ -126,19 +126,16 @@ export async function importCharacterProcess(f:{
             }
         }
         
-        const reader = new CharXReader()
-        reader.alertInfo = true
+        const importer = new CharXImporter()
+        importer.alertInfo = true
         if(charXMode === 'skippable'){
-            reader.skipSaving = true
+            importer.skipSaving = true
         }
         if(charXMode === 'signal'){
-            reader.hashSignal = signal
+            importer.hashSignal = signal
         }
-        const promise = reader.makePromise()
-        await reader.read(f.data, {
-            alertInfo: true
-        })
-        const cardData = reader.cardData
+        await importer.parse(f.data)
+        const cardData = importer.cardData
         if(!cardData){
             alertError(language.errors.noData)
             return
@@ -149,8 +146,8 @@ export async function importCharacterProcess(f:{
             return
         }
         let lorebook:loreBook[] = null
-        if(reader.moduleData){
-            const md = await readModule(Buffer.from(reader.moduleData))
+        if(importer.moduleData){
+            const md = await readModule(Buffer.from(importer.moduleData))
             card.data.extensions ??= {}
             card.data.extensions.risuai ??= {}
             card.data.extensions.risuai.triggerscript = md.trigger ?? []
@@ -159,8 +156,8 @@ export async function importCharacterProcess(f:{
                 lorebook = md.lorebook
             }
         }
-        await promise
-        await importCharacterCardSpec(card, undefined, 'normal', reader.assets, lorebook)
+        await importer.done()
+        await importCharacterCardSpec(card, undefined, 'normal', importer.assets, lorebook)
         let db = getDatabase()
         return db.characters.length - 1
     }
@@ -1341,6 +1338,7 @@ export async function exportCharacterCard(char:character, type:'png'|'json'|'cha
         }
         else if(spec === 'v3'){
             const card = createBaseV3(char)
+            const seenPaths = new Set<string>()
             if(card.data.assets && card.data.assets.length > 0){
                 for(let i=0;i<card.data.assets.length;i++){
                     alertStore.set({
@@ -1435,15 +1433,24 @@ export async function exportCharacterCard(char:character, type:'png'|'json'|'cha
                         if(name.length > 100){
                             name = name.substring(0,100)
                         }
-                        if(card.data.assets[i].ext === 'unknown'){
-                            path = `assets/${type}/image/${name}.png`
+                        const ext = card.data.assets[i].ext === 'unknown' ? 'png' : card.data.assets[i].ext
+                        const baseDir = card.data.assets[i].ext === 'unknown'
+                            ? `assets/${type}/image`
+                            : `assets/${type}/${itype}`
+
+                        // Generate unique path to avoid duplicate filenames
+                        let uniqueName = name
+                        let suffix = 0
+                        while(seenPaths.has(`${baseDir}/${uniqueName}.${ext}`)){
+                            suffix++
+                            uniqueName = `${name}_${suffix}`
                         }
-                        else{
-                            path = `assets/${type}/${itype}/${name}.${card.data.assets[i].ext}`
-                        }
+                        path = `${baseDir}/${uniqueName}.${ext}`
+                        seenPaths.add(path)
+
                         card.data.assets[i].uri = 'embeded://' + path
                         const imageType = checkImageType(rData)
-                        const metaPath = `x_meta/${name}.json`
+                        const metaPath = `x_meta/${uniqueName}.json`
                         if(imageType === 'PNG' && writer instanceof CharXWriter){
                             const metadatas:Record<string,string> = {}
                             const gen = PngChunk.readGenerator(rData)

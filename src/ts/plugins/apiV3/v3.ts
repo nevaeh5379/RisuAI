@@ -8,7 +8,8 @@ import { v4 } from "uuid";
 import { sleep } from "src/ts/util";
 import { alertConfirm, alertError, alertNormal } from "src/ts/alert";
 import { language } from "src/lang";
-import { getFetchLogs } from "src/ts/globalApi.svelte";
+import { checkCharOrder, forageStorage, getFetchLogs } from "src/ts/globalApi.svelte";
+import { isNodeServer, isTauri } from "src/ts/platform";
 
 /*
     V3 API for RisuAI Plugins
@@ -210,7 +211,9 @@ class SafeElement {
         const san = DOMPurify.sanitize(value);
         this.#element.outerHTML = san;
     }
-
+    public scrollIntoView(options?: boolean | ScrollIntoViewOptions) {
+        this.#element.scrollIntoView(options);
+    }
     #eventIdMap = new Map<string, Function>()
 
     public async addEventListener(type:string, listener: (event: any) => void, options?: boolean | AddEventListenerOptions):Promise<string> {
@@ -293,7 +296,7 @@ class SafeElement {
             const modifiedListener = (event: any) => {
                 let delay = 0;
                 try {
-                    delay = crypto.getRandomValues(new Uint32Array(1))[0];                    
+                    delay = (crypto.getRandomValues(new Uint32Array(1))[0] / 100) % 100; //0-99 ms              
                 } catch (error) {}
                 setTimeout(() => {
                     listener(trimEvent(event));
@@ -308,7 +311,7 @@ class SafeElement {
         }        
     }
 
-    removeEventListener(type:string, id:string, options?: boolean | EventListenerOptions) {
+    public removeEventListener(type:string, id:string, options?: boolean | EventListenerOptions) {
         const listener = this.#eventIdMap.get(id);
         if(listener){
             const realOptions = typeof options === 'boolean' ? { capture: options } : options || {};
@@ -317,7 +320,7 @@ class SafeElement {
         }
     }
 
-    matches: (selector: string) => boolean = (selector: string) => {
+    public matches (selector: string): boolean {
         return this.#element.matches(selector);
     }
 }
@@ -497,7 +500,7 @@ const unloadV3Plugin = async (pluginName: string) => {
 
 const permissionGivenPlugins: Set<string> = new Set();
 
-const checkPluginPermission = async (pluginName: string, permissionDesc: 'fetchLogs'|'db'|'mainDom') => {
+const getPluginPermission = async (pluginName: string, permissionDesc: 'fetchLogs'|'db'|'mainDom') => {
     if(permissionGivenPlugins.has(pluginName)){
         return true;
     }
@@ -506,6 +509,9 @@ const checkPluginPermission = async (pluginName: string, permissionDesc: 'fetchL
         : permissionDesc === 'db' ? language.getFullDatabaseConsent.replace("{}", pluginName)
         : permissionDesc === 'mainDom' ? language.mainDomAccessConsent.replace("{}", pluginName)
         : `Error`
+    if(alertTitle === 'Error'){
+        return false;
+    }
     const conf = await alertConfirm(alertTitle)
     if(conf){
         permissionGivenPlugins.add(pluginName);
@@ -537,7 +543,7 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
 
         //Same functionality, but new implementation
         getDatabase: async () => {
-            const conf = await checkPluginPermission(plugin.name, 'db');
+            const conf = await getPluginPermission(plugin.name, 'db');
             if(!conf){
                 return null;
             }
@@ -611,7 +617,7 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
             iframe.style.display = "none";
         },
         getRootDocument: async () => {
-            const conf = await checkPluginPermission(plugin.name, 'mainDom');
+            const conf = await getPluginPermission(plugin.name, 'mainDom');
             if(!conf){
                 return null;
             }
@@ -641,6 +647,7 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
                 plugin.name,
                 makeMenuUnloadCallback(id, additionalSettingsMenu)
             )
+            return {id:id};
         },
         registerButton: (
             arg: {
@@ -701,6 +708,20 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
                     throw new Error("Invalid location for button")
                 }
             }
+            return {id:id};
+        },
+        unregisterUIPart: (id: string) => {
+            const removeFromMenuStore = (menuStore: MenuDef[]) => {
+                const index = menuStore.findIndex(item => item.id === id);
+                if(index !== -1){
+                    menuStore.splice(index, 1);
+                }
+            }
+
+            removeFromMenuStore(additionalSettingsMenu);
+            removeFromMenuStore(additionalFloatingActionButtons);
+            removeFromMenuStore(additionalHamburgerMenu);
+            removeFromMenuStore(additionalChatMenu);
         },
         log: (message:string) => {
             console.log(`[RisuAI Plugin: ${plugin.name}] ${message}`);
@@ -713,7 +734,7 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
         },
         getFetchLogs: async () => {
             const unsafeFetchLog = getFetchLogs()
-            const conf = await checkPluginPermission(plugin.name, 'fetchLogs');
+            const conf = await getPluginPermission(plugin.name, 'fetchLogs');
             if(!conf){
                 return null;
             }
@@ -737,6 +758,23 @@ const makeRisuaiAPIV3 = (iframe:HTMLIFrameElement,plugin:RisuPlugin) => {
         },
         alertError: (msg:string) => {
             return alertError(msg)
+        },
+        getRuntimeInfo: () => {
+            return {
+                apiVersion: "3.0",
+                platform: 
+                    isNodeServer ? 'node' :
+                    isTauri ? 'tauri' :
+                    'web',
+                saveMethod:
+                    isTauri ? 'tauri' :
+                    forageStorage.isAccount ? 'account' :
+                    'local',
+            }
+        },
+        checkCharOrder: checkCharOrder,
+        requestPluginPermission: (permission:string) => {
+            return getPluginPermission(plugin.name, permission as any);
         },
         //Internal use APIs
         _getOldKeys: () => {
@@ -805,6 +843,13 @@ export async function loadV3Plugins(plugins:RisuPlugin[]){
 }
 
 export async function executePluginV3(plugin:RisuPlugin){
+
+    const alreadyRunning = v3PluginInstances.find(p => p.name === plugin.name);
+    if(alreadyRunning){
+        console.log(`[RisuAI Plugin: ${plugin.name}] Plugin is already running. Skipping load.`);
+        return;
+    }
+
     const iframe = document.createElement('iframe');
     iframe.style.display = "none";
     document.body.appendChild(iframe);

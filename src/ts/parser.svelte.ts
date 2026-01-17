@@ -1,18 +1,18 @@
 import DOMPurify from 'dompurify';
 import markdownit from 'markdown-it'
 import { appVer, getCurrentCharacter, getDatabase, type Database, type character, type customscript, type groupChat, type triggerscript } from './storage/database.svelte';
-import { DBState } from './stores.svelte';
+import { DBState, selIdState } from './stores.svelte';
 import { aiWatermarkingLawApplies, getFileSrc } from './globalApi.svelte';
 import { isTauri, isNodeServer } from "src/ts/platform"
+import { getChatVar, setChatVar, getGlobalChatVar } from './parser/chatVar.svelte';
 import { processScriptFull } from './process/scripts';
 import { get } from 'svelte/store';
 import css, { type CssAtRuleAST } from '@adobe/css-tools'
 import { selectedCharID } from './stores.svelte';
 import { calcString } from './process/infunctions';
-import { findCharacterbyId, getPersonaPrompt, getUserIcon, getUserName, parseKeyValue, pickHashRand, replaceAsync} from './util';
+import { findCharacterbyId, getPersonaPrompt, getUserIcon, getUserName, pickHashRand, replaceAsync} from './util';
 import { getInlayAssetBlob } from './process/files/inlays';
 import { getModuleAssets, getModuleLorebooks, getModules } from './process/modules';
-import type { OpenAIChat } from './process/index.svelte';
 import hljs from 'highlight.js/lib/core'
 import 'highlight.js/styles/atom-one-dark.min.css'
 import { language } from 'src/lang';
@@ -69,8 +69,6 @@ DOMPurify.addHook("uponSanitizeElement", (node: HTMLElement, data) => {
         if(!decoding){
             node.setAttribute("decoding", "async")
         }
-
-        const src = node.getAttribute("src") || "";
     }
 });
 
@@ -417,6 +415,7 @@ function getEmoSrc(emoArr: string[][], emoPaths: AssetPaths) {
 }
 
 const fileSrcCache = new Map<string, string>()
+
 async function getFileSrcCached(path:string){
     let cached = fileSrcCache.get(path)
     if(cached){
@@ -432,40 +431,64 @@ type AssetPaths = {[key:string]:{
     ext?:string
 }}
 
+let assetsCache: AssetPaths | null = null
+let emoAssetsCache: AssetPaths | null = null
+
+export function resetAssetsCache(charAssets: string[][], emoAssets: string[][], moduleAssets: string[][]) {
+    const assetPaths: AssetPaths = {}
+    const charEmoPaths: AssetPaths = {}
+
+    getAssetSrc(charAssets, assetPaths)
+    getAssetSrc(moduleAssets, assetPaths)
+    getEmoSrc(emoAssets, charEmoPaths)
+
+    assetsCache = assetPaths
+    emoAssetsCache = charEmoPaths
+}
+
+$effect.root(() => {
+    $effect(() => {
+        const charId = selIdState.selId
+        const char = DBState.db.characters?.[charId]
+        if (!char || char.type !== 'character') {
+            return
+        }
+
+        const charAssets = char.additionalAssets ?? []
+        const emoAssets = char.emotionImages ?? []
+        const moduleAssets = getModuleAssets()
+
+        resetAssetsCache(charAssets, emoAssets, moduleAssets)
+    })
+})
+
+const imageCBS = ['img', 'image', 'emotion', 'asset', 'bg', 'raw', 'path']
+const videoExtensions = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
+
 async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|character, mode:'normal'|'back', arg:{ch:number}){
     const assetWidthString = (DBState.db.assetWidth && DBState.db.assetWidth !== -1 || DBState.db.assetWidth === 0) ? `max-width:${DBState.db.assetWidth}rem;` : ''
 
-    let assetPaths:AssetPaths = {}
-    let emoPaths:AssetPaths = {}
+    if (char.type === 'character' && (!assetsCache || !emoAssetsCache)) {
+        resetAssetsCache(char.additionalAssets ?? [], char.emotionImages, getModuleAssets())
+    }
 
-    if (char.emotionImages) getEmoSrc(char.emotionImages, emoPaths)
+    const assetPaths = assetsCache ?? {}
+    const emoPaths = emoAssetsCache ?? {}
 
-    const videoExtention = ['mp4', 'webm', 'avi', 'm4p', 'm4v']
     let needsSourceAccess = false
-
-    const moduleAssets = getModuleAssets()
-
-    if (char.additionalAssets) {
-        getAssetSrc(char.additionalAssets, assetPaths)
-    }
-    if (moduleAssets.length > 0) {
-        getAssetSrc(moduleAssets, assetPaths)
-    }
-
-    let cx:number|null = null
+    let cx: number|null = null
 
     data = await replaceAsync(data, assetRegex, async (full:string, type:string, name:string) => {
         name = name.toLocaleLowerCase()
 
         // Skip image-related assets when hideAllImages is enabled
         // raw and path are also included as they're used in CSS background-image
-        const imageTypes = ['img', 'image', 'emotion', 'asset', 'bg', 'raw', 'path']
-        if(DBState.db.hideAllImages && imageTypes.includes(type)){
+        if(DBState.db.hideAllImages && imageCBS.includes(type)){
             return ''  // Hide the image asset
         }
 
         if(type === 'emotion'){
-            const srcPath = emoPaths[name]?.srcPaths?.[0]
+            const srcPath = emoPaths?.[name]?.srcPaths?.[0]
             const path = srcPath ? await getFileSrcCached(srcPath) : null
             if(!path){
                 return ''
@@ -485,14 +508,16 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
             }
         }
 
-        let match = assetPaths[name]
+        let match = assetPaths?.[name]
 
         if(!match){
             if(DBState.db.legacyMediaFindings){
                 return ''
             }
 
-            match = getClosestMatch(char, name, assetPaths)
+            if(assetPaths){
+                match = getClosestMatch(char, name, assetPaths)
+            }
 
             if(!match){
                 return ''
@@ -531,7 +556,7 @@ async function parseAdditionalAssets(data:string, char:simpleCharacterArgument|c
                 }
                 break
             case 'asset':{
-                if(match.ext && videoExtention.includes(match.ext)){
+                if(match.ext && videoExtensions.includes(match.ext)){
                     return `<video autoplay muted loop><source src="${p}" type="video/mp4"></video>\n`
                 }
                 return `<img src="${p}" alt="${p}" style="${assetWidthString} "/>\n`
@@ -743,10 +768,6 @@ export function trimMarkdown(data:string){
         ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "scrolling", "risu-ctrl" ,"risu-btn", 'risu-trigger', 'risu-mark', 'risu-id', 'x-hl-lang', 'x-hl-text'],
     }))
 }
-
-const placeToPutMetadata = new Set([
-    ' ', '\n'
-])
 
 const metaCodes = [
     '\u200B', //zero width space
@@ -983,47 +1004,6 @@ export function checkImageType(arr:Uint8Array):ImageType {
     return "Unknown";
 }
 
-function wppParser(data:string){
-    const lines = data.split('\n');
-    let characterDetails:{[key:string]:string[]} = {};
-
-    lines.forEach(line => {
-
-        // Check for "{" and "}" indicator of object start and end
-        if(line.includes('{')) return;
-        if(line.includes('}')) return;
-
-        // Extract key and value within brackets
-        let keyBracketStartIndex = line.indexOf('(');
-        let keyBracketEndIndex = line.indexOf(')');
-    
-       if(keyBracketStartIndex === -1 || keyBracketEndIndex === -1) 
-            throw new Error(`Invalid syntax ${line}`);
-        
-       let key = line.substring(0, keyBracketStartIndex).trim();
-
-         // Validate Key    
-         if(!key) throw new Error(`Missing Key in ${line}`);
-
-      const valueArray=line.substring(keyBracketStartIndex + 1, keyBracketEndIndex)
-          .split(',')
-          .map(str => str.trim());
-      
-      // Validate Values
-      for(let i=0;i<valueArray.length ;i++){
-           if(!valueArray[i])
-               throw new Error(`Empty Value in ${line}`);
-              
-     }
-      characterDetails[key] = valueArray;
-   });
-
-   return characterDetails;
-}
-
-
-const rgx = /(?:{{|<)(.+?)(?:}}|>)/gm
-
 export type CbsConditions = {
     firstmsg?:boolean
     chatRole?:string
@@ -1147,43 +1127,6 @@ const dateTimeFormat = (main:string, time = 0) => {
 
 }
 
-const smMatcher = (p1:string,matcherArg:matcherArg) => {
-    if(!p1){
-        return null
-    }
-    const lowerCased = p1.toLocaleLowerCase()
-    const db = matcherArg.db
-    const chara = matcherArg.chara
-    switch(lowerCased){
-        case 'char':
-        case 'bot':{
-            if(matcherArg.consistantChar){
-                return 'botname'
-            }
-            let selectedChar = get(selectedCharID)
-            let currentChar = db.characters[selectedChar]
-            if(currentChar && currentChar.type !== 'group'){
-                return currentChar.nickname || currentChar.name
-            }
-            if(chara){
-                if(typeof(chara) === 'string'){
-                    return chara
-                }
-                else{
-                    return chara.name
-                }
-            }
-            return currentChar.nickname || currentChar.name
-        }
-        case 'user':{
-            if(matcherArg.consistantChar){
-                return 'username'
-            }
-            return getUserName()
-        }
-    }
-}
-
 const legacyBlockMatcher = (p1:string,matcherArg:matcherArg) => {
     const bn = p1.indexOf('\n')
 
@@ -1210,7 +1153,7 @@ const legacyBlockMatcher = (p1:string,matcherArg:matcherArg) => {
 
 type blockMatch = 'ignore'|'parse'|'nothing'|'ifpure'|'pure'|'each'|'function'|'pure-display'|'normalize'|'escape'|'newif'|'newif-falsy'
 
-function parseArray(p1:string):string[]{
+function parseArray(p1:string): unknown[]{
     try {
         const arr = JSON.parse(p1)
         if(Array.isArray(arr)){
@@ -1222,7 +1165,7 @@ function parseArray(p1:string):string[]{
     }
 }
 
-function parseDict(p1:string):{[key:string]:string}{
+function parseDict(p1 :string): {[key:string]: unknown}{
     try {
         return JSON.parse(p1)
     } catch (error) {
@@ -1230,7 +1173,7 @@ function parseDict(p1:string):{[key:string]:string}{
     }
 }
 
-function makeArray(p1:string[]):string{
+function makeArray(p1: unknown[]): string{
     return JSON.stringify(p1.map((f) => {
         if(typeof(f) === 'string'){
             return f.replace(/::/g, '\\u003A\\u003A')
@@ -1374,7 +1317,6 @@ function blockStartMatcher(p1:string,matcherArg:matcherArg):{type:blockMatch,typ
                     }
                     case 'tis':{ //tis = toggle is
                         const variable = getGlobalChatVar('toggle_' + statement.pop())
-                        console.log('tis', variable, condition)
                         if(variable === condition){
                             statement.push('1')
                         }
@@ -1642,7 +1584,6 @@ export function risuChatParser(da:string, arg:{
     const chatID = arg.chatID ?? -1
     const db = arg.db ?? DBState.db
     const aChara = arg.chara
-    const visualize = arg.visualize ?? false
     let chara:character|string = null
 
     if(aChara){
@@ -1807,9 +1748,8 @@ export function risuChatParser(da:string, arg:{
                                 array = parseArray(blockType.type2.substring(0, subind))
                             }
                             let added = ''
-                            for(let i = 0;i < array.length;i++){
-                                const res = matchResult.replaceAll(`{{slot::${sub}}}`, array[i])
-                                added += res
+                            for(let i = 0; i < array.length; i++) {
+                                added += matchResult.replaceAll(`{{slot::${sub}}}`, typeof(array[i]) === 'string' ? array[i] as string : JSON.stringify(array[i]))
                             }
                             da = da.substring(0, pointer + 1) + (blockType.mode === 'keep' ? added : added.trim()) + da.substring(pointer + 1)
                             break
@@ -1900,110 +1840,6 @@ export function risuChatParser(da:string, arg:{
     return nested[0] + result
 }
 
-
-
-export function getChatVar(key:string){
-    const selectedChar = get(selectedCharID)
-    const char = DBState.db.characters[selectedChar]
-    if(!char){
-        return 'null'
-    }
-    const chat = char.chats[char.chatPage]
-    chat.scriptstate ??= {}
-    const state = (chat.scriptstate['$' + key])
-    if(state === undefined || state === null){
-        const defaultVariables = parseKeyValue(char.defaultVariables).concat(parseKeyValue(DBState.db.templateDefaultVariables))
-        const findResult = defaultVariables.find((f) => {
-            return f[0] === key
-        })
-        if(findResult){
-            return findResult[1]
-        }
-        return 'null'
-    }
-    return state.toString()
-}
-
-export function getGlobalChatVar(key:string){
-    return DBState.db.globalChatVariables[key] ?? 'null'
-}
-
-export function setGlobalChatVar(key:string, value:string){ 
-    DBState.db.globalChatVariables[key] = value // String to String Map(dictionary)
-}
-
-export function setChatVar(key:string, value:string){
-    const selectedChar = get(selectedCharID)
-    if(!DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].scriptstate){
-        DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].scriptstate = {}
-    }
-    DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].scriptstate['$' + key] = value
-}
-
-
-function editDisplay(text){
-    let rt = ""
-    if(!text.includes("<obs>")){
-        return text
-    }
-
-    for(let i=0;i<text.length;i++){
-        const obfiEffect = "!@#$%^&*"
-        if(Math.random() < 0.4){
-            rt += obfiEffect[Math.floor(Math.random() * obfiEffect.length)]
-        }
-        rt += text[i]
-    }
-    return rt
-}
-
-export type PromptParsed ={[key:string]:string|PromptParsed}
-
-export function promptTypeParser(prompt:string):string | PromptParsed{
-    //XML type
-    try {
-        const parser = new DOMParser()
-        const dom = `<root>${prompt}</root>`
-        const xmlDoc = parser.parseFromString(dom, "text/xml")
-        const root = xmlDoc.documentElement
-
-        const errorNode = root.getElementsByTagName('parsererror')
-
-        if(errorNode.length > 0){
-            throw new Error('XML Parse Error') //fallback to other parser
-        }
-
-        const parseNode = (node:Element):string|PromptParsed => {
-            if(node.children.length === 0){
-                return node.textContent
-            }
-
-            const data:{[key:string]:string|PromptParsed} = {}
-
-            for(let i=0;i<node.children.length;i++){
-                const child = node.children[i]
-                data[child.tagName] = parseNode(child)
-            }
-
-            return data
-        }
-
-        const pnresult = parseNode(root)
-
-        if(typeof(pnresult) === 'string'){
-            throw new Error('XML Parse Error') //fallback to other parser
-        }
-
-        return pnresult
-
-    } catch (error) {
-        
-    }
-
-    return prompt
-}
-
-
 export function applyMarkdownToNode(node: Node) {
     if (node.nodeType === Node.TEXT_NODE) {
         const text = node.textContent;
@@ -2029,64 +1865,4 @@ export function applyMarkdownToNode(node: Node) {
             applyMarkdownToNode(child);
         }
     }
-}
-
-export function parseChatML(data:string):OpenAIChat[]|null{
-
-    const starter = '<|im_start|>'
-    const seperator = '<|im_sep|>'
-    const ender = '<|im_end|>'
-    const trimedData = data.trim()
-    if(!trimedData.startsWith(starter)){
-        return null
-    }
-
-    return trimedData.split(starter).filter((f) => f !== '').map((v) => {
-        let role:'system'|'user'|'assistant' = 'user'
-        //default separators
-        if(v.startsWith('user' + seperator)){
-            role = 'user'
-            v = v.substring(4 + seperator.length)
-        }
-        else if(v.startsWith('system' + seperator)){
-            role = 'system'
-            v = v.substring(6 + seperator.length)
-        }
-        else if(v.startsWith('assistant' + seperator)){
-            role = 'assistant'
-            v = v.substring(9 + seperator.length)
-        }
-        //space/newline separators
-        else if(v.startsWith('user ') || v.startsWith('user\n')){
-            role = 'user'
-            v = v.substring(5)
-        }
-        else if(v.startsWith('system ') || v.startsWith('system\n')){
-            role = 'system'
-            v = v.substring(7)
-        }
-        else if(v.startsWith('assistant ') || v.startsWith('assistant\n')){
-            role = 'assistant'
-            v = v.substring(10)
-        }
-
-        v = v.trim()
-
-        if(v.endsWith(ender)){
-            v = v.substring(0, v.length - ender.length)
-        }
-
-
-        let thoughts:string[] = []
-        v = v.replace(/<Thoughts>(.+)<\/Thoughts>/gms, (match, p1) => {
-            thoughts.push(p1)
-            return ''
-        })
-
-        return {
-            role: role,
-            content: risuChatParser(v),
-            thoughts: thoughts
-        }
-    })
 }

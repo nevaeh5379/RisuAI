@@ -948,73 +948,56 @@
                 {/if}
             </button>
         {/if}
-        {#if !$ConnectionOpenStore}
-            <button
-                class={"flex items-center hover:text-blue-500 transition-colors button-icon-edit " +
-                    (editMode ? "text-blue-400" : "")}
-                onclick={() => {
-                    if (!editMode) {
-                        editMode = true;
-                    } else {
-                        editMode = false;
-                        edit();
-                    }
-                }}
-            >
-                <PencilIcon size={20} />
-
-                {#if showNames}
-                    <span class="ml-1">{language.edit}</span>
-                {/if}
-            </button>
-            <button
-                class="flex items-center hover:text-blue-500 transition-colors button-icon-remove"
-                onclick={(e) => rm(e, false)}
-                use:longpress={(e) => rm(e, true)}
-            >
-                <TrashIcon size={20} />
-
-                {#if showNames}
-                    <span class="ml-1">{language.remove}</span>
-                {/if}
-            </button>
-        {/if}
-        {#if DBState.db.enableLogExport}
-            <button
-                class="flex items-center hover:text-blue-500 transition-colors"
-                onclick={async () => {
-                    $exportModalStore = {
-                        open: true,
-                        chatId: DBState.db.characters[selIdState.selId]
-                            ?.chats?.[
-                            DBState.db.characters[selIdState.selId]?.chatPage
-                        ]?.id,
-                        startIndex: idx,
-                        endIndex: idx,
-                        initialIndex: idx,
-                    };
-                }}
-            >
-                <Download size={20} />
-                {#if showNames}
-                    <span class="ml-1">{language.exportLogs}</span>
-                {/if}
-            </button>
-        {/if}
+{/if}
+{#if idx > -1}
+    {#if DBState.db.characters[selIdState.selId].type !== 'group' && DBState.db.characters[selIdState.selId].ttsMode !== 'none' && (DBState.db.characters[selIdState.selId].ttsMode)}
+        <button class="flex items-center hover:text-blue-500 transition-colors button-icon-tts" onclick={()=>{
+            return sayTTS(null, message)
+        }}>
+            <Volume2Icon size={20}/>
+            {#if showNames}
+                <span class="ml-1">TTS</span>
+            {/if}
+        </button>
     {/if}
+    {#if !$ConnectionOpenStore}
+        <button class="flex items-center hover:text-blue-500 transition-colors button-icon-remove" onclick={(e) => rm(e, false)} use:longpress={(e) => rm(e, true)}>
+            <TrashIcon size={20}/>
+
+            {#if showNames}
+                <span class="ml-1">{language.remove}</span>
+            {/if}
+        </button>
+    {/if}
+{/if}
 {/snippet}
 
-{#snippet translationButton()}
-    {#if DBState.db.translator !== "" && !blankMessage}
-        <button
-            class={"flex items-center cursor-pointer hover:text-blue-500 transition-colors button-icon-translate " +
-                (translated ? "text-blue-400" : "")}
-            class:translating
-            onclick={async () => {
-                translated = !translated;
-            }}
-        >
+{#snippet translationButton(showNames = false)}
+    {#if DBState.db.translator !== '' && !blankMessage}
+        <button class={"flex items-center cursor-pointer hover:text-blue-500 transition-colors button-icon-translate " + (translated ? 'text-blue-400':'')} class:translating={translating} onclick={async () => {
+            translated = !translated
+        }}>
             <LanguagesIcon />
+            {#if showNames}
+                <span class="ml-1">{language.translate}</span>
+            {/if}
+        </button>
+    {/if}
+    {#if idx > -1}
+        <button class={"flex items-center hover:text-blue-500 transition-colors button-icon-edit "+(editMode?'text-blue-400':'')} onclick={() => {
+            if(!editMode){
+                editMode = true
+            }
+            else{
+                editMode = false
+                edit()
+            }
+        }}>
+            <PencilIcon size={20}/>
+
+            {#if showNames}
+                <span class="ml-1">{language.edit}</span>
+            {/if}
         </button>
     {/if}
 {/snippet}

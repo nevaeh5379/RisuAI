@@ -15,7 +15,7 @@ import { type HypaV3Settings, type HypaV3Preset, createHypaV3Preset } from '../p
 import { isTauri, isNodeServer } from "src/ts/platform"
 
 //APP_VERSION_POINT is to locate the app version in the database file for version bumping
-export let appVer = "2026.1.63" //<APP_VERSION_POINT>
+export let appVer = "2026.1.90" //<APP_VERSION_POINT>
 export let webAppSubVer = ''
 
 
@@ -590,7 +590,24 @@ export function setDatabase(data: Database) {
     }
     data.doNotChangeSeperateModels ??= false
     data.modelTools ??= []
-    data.hotkeys ??= safeStructuredClone(defaultHotkeys)
+    data.enableScrollToActiveChar ??= true
+    
+    // Merge existing hotkeys with new default hotkeys
+    if (!data.hotkeys) {
+        data.hotkeys = safeStructuredClone(defaultHotkeys)
+    } else {
+        const existingActions = new Set(data.hotkeys.map(h => h.action))
+        const newHotkeys = defaultHotkeys.filter(h => !existingActions.has(h.action))
+        if (newHotkeys.length > 0) {
+            data.hotkeys.push(...safeStructuredClone(newHotkeys))
+        }
+    }
+    
+    // Remove scrollToActiveChar hotkey if feature is disabled
+    if (data.enableScrollToActiveChar === false) {
+        data.hotkeys = data.hotkeys.filter(h => h.action !== 'scrollToActiveChar')
+    }
+    
     data.fallbackModels ??= {
         memory: [],
         emotion: [],
@@ -1156,16 +1173,17 @@ export interface Database {
     simplifiedToolUse: boolean
     requestLocation: string
     newImageHandlingBeta?: boolean
-    showFirstMessagePages: boolean
-    streamGeminiThoughts: boolean
-    verbosity: number
-    dynamicOutput?: DynamicOutput
-    hubServerType?: string
-    pluginCustomStorage: { [key: string]: any }
-    ImagenModel: string
-    ImagenImageSize: string
-    ImagenAspectRatio: string
-    ImagenPersonGeneration: string,
+    showFirstMessagePages:boolean
+    streamGeminiThoughts:boolean
+    verbosity:number
+    dynamicOutput?:DynamicOutput
+    hubServerType?:string
+    pluginCustomStorage:{[key:string]:any}
+    ImagenModel:string
+    ImagenImageSize:string
+    ImagenAspectRatio:string
+    ImagenPersonGeneration:string,
+    enableScrollToActiveChar:boolean
     titleGeneration: {
         model: string
         prompt: string
