@@ -9,6 +9,8 @@
     import LoreBookList from "./LoreBookList.svelte";
     import Help from "src/lib/Others/Help.svelte";
     import { selectedCharID } from "src/ts/stores.svelte";
+    import LoreBookPlusTest from "./LoreBookPlusTest.svelte";
+    import TextInput from "../../UI/GUI/TextInput.svelte";
 
     let submenu = $state(0)
     interface Props {
@@ -16,6 +18,18 @@
     }
 
     let { globalMode = $bindable(false) }: Props = $props();
+
+    // Initialize lorebookPlusSettings and rerankerConfig if not present
+    function ensureLorebookPlusSettings() {
+        if (!DBState.db.lorebookPlusSettings) {
+            DBState.db.lorebookPlusSettings = { embeddingThreshold: 0.4, maxEmbeddingResults: 30 };
+        }
+    }
+    function ensureRerankerConfig() {
+        if (!DBState.db.rerankerConfig) {
+            DBState.db.rerankerConfig = { enabled: false, url: '' };
+        }
+    }
 
     function isAllCharacterLoreAlwaysActive() {
         const globalLore = DBState.db.characters[$selectedCharID].globalLore;
@@ -114,8 +128,165 @@
                 name={language.lorePlus}
             ><Help key="lorePlus"></Help><Help key="experimental"></Help></Check>
         {/if}
-
     </div>
+    
+    {#if DBState.db.useExperimental && DBState.db.characters[$selectedCharID].lorePlus}
+        <!-- LoreBook+ Settings -->
+        <div class="mt-4 p-3 border border-selected rounded-lg bg-bgcolor2">
+            <h4 class="text-textcolor font-medium mb-3">{language.lorePlus} {language.settings}</h4>
+            
+            <!-- Similarity Threshold -->
+            <div class="mb-3">
+                <span class="text-textcolor2 text-sm">{language.lorebookPlusThreshold ?? 'Similarity Threshold'}</span>
+                <NumberInput 
+                    size="sm" 
+                    min={0} 
+                    max={100} 
+                    value={(DBState.db.lorebookPlusSettings?.embeddingThreshold ?? 0.4) * 100}
+                    onChange={(e) => {
+                        ensureLorebookPlusSettings();
+                        DBState.db.lorebookPlusSettings.embeddingThreshold = e.currentTarget.valueAsNumber / 100;
+                    }}
+                />
+                <span class="text-textcolor2 text-xs ml-2">%</span>
+            </div>
+            
+            <!-- Max Embedding Results -->
+            <div class="mb-3">
+                <span class="text-textcolor2 text-sm">{language.lorebookPlusMaxResults ?? 'Max Embedding Results'}</span>
+                <NumberInput 
+                    size="sm" 
+                    min={1} 
+                    max={100} 
+                    value={DBState.db.lorebookPlusSettings?.maxEmbeddingResults ?? 30}
+                    onChange={(e) => {
+                        ensureLorebookPlusSettings();
+                        DBState.db.lorebookPlusSettings.maxEmbeddingResults = e.currentTarget.valueAsNumber;
+                    }}
+                />
+            </div>
+            
+            <!-- Max Tokens for Embedding -->
+            <div class="mb-3">
+                <span class="text-textcolor2 text-sm">{language.lorebookPlusMaxTokens ?? 'Max Tokens (Embedding)'}</span>
+                <NumberInput 
+                    size="sm" 
+                    min={500} 
+                    max={10000} 
+                    value={DBState.db.lorebookPlusSettings?.maxTokens ?? 2000}
+                    onChange={(e) => {
+                        ensureLorebookPlusSettings();
+                        DBState.db.lorebookPlusSettings.maxTokens = e.currentTarget.valueAsNumber;
+                    }}
+                />
+                <span class="text-textcolor2 text-xs ml-1">tokens</span>
+            </div>
+            
+            <LoreBookPlusTest />
+        </div>
+        
+        <!-- Reranker Settings -->
+        <div class="mt-4 p-3 border border-selected rounded-lg bg-bgcolor2">
+            <div class="flex items-center justify-between mb-3">
+                <h4 class="text-textcolor font-medium">{language.rerankerSettings ?? 'Reranker Settings'}</h4>
+                <Check 
+                    check={DBState.db.rerankerConfig?.enabled ?? false}
+                    onChange={(v) => {
+                        if (!DBState.db.rerankerConfig) {
+                            DBState.db.rerankerConfig = { enabled: false, url: '' };
+                        }
+                        DBState.db.rerankerConfig.enabled = v;
+                    }}
+                    name={language.rerankerEnabled ?? 'Enable Reranker'}
+                />
+            </div>
+            
+            {#if DBState.db.rerankerConfig?.enabled}
+                <!-- Reranker URL -->
+                <div class="mb-3">
+                    <span class="text-textcolor2 text-sm block mb-1">{language.rerankerUrl ?? 'Reranker API URL'}</span>
+                    <TextInput 
+                        size="sm" 
+                        fullwidth
+                        placeholder="https://api.example.com/rerank"
+                        value={DBState.db.rerankerConfig?.url ?? ''}
+                        oninput={(e) => {
+                            if (!DBState.db.rerankerConfig) {
+                                DBState.db.rerankerConfig = { enabled: true, url: '' };
+                            }
+                            DBState.db.rerankerConfig.url = e.currentTarget.value;
+                        }}
+                    />
+                </div>
+                
+                <!-- Reranker API Key -->
+                <div class="mb-3">
+                    <span class="text-textcolor2 text-sm block mb-1">{language.rerankerKey ?? 'Reranker API Key'}</span>
+                    <TextInput 
+                        size="sm" 
+                        fullwidth
+                        hideText
+                        placeholder="sk-..."
+                        value={DBState.db.rerankerConfig?.key ?? ''}
+                        oninput={(e) => {
+                            if (!DBState.db.rerankerConfig) {
+                                DBState.db.rerankerConfig = { enabled: true, url: '' };
+                            }
+                            DBState.db.rerankerConfig.key = e.currentTarget.value;
+                        }}
+                    />
+                </div>
+                
+                <!-- Reranker Model -->
+                <div class="mb-3">
+                    <span class="text-textcolor2 text-sm block mb-1">{language.rerankerModel ?? 'Reranker Model'}</span>
+                    <TextInput 
+                        size="sm" 
+                        fullwidth
+                        placeholder="Qwen/Qwen3-VL-Reranker-2B"
+                        value={DBState.db.rerankerConfig?.model ?? ''}
+                        oninput={(e) => {
+                            if (!DBState.db.rerankerConfig) {
+                                DBState.db.rerankerConfig = { enabled: true, url: '' };
+                            }
+                            DBState.db.rerankerConfig.model = e.currentTarget.value;
+                        }}
+                    />
+                </div>
+                
+                <!-- Reranker Top K -->
+                <div class="mb-1">
+                    <span class="text-textcolor2 text-sm">{language.rerankerTopK ?? 'Reranker Top K'}</span>
+                    <NumberInput 
+                        size="sm" 
+                        min={1} 
+                        max={50} 
+                        value={DBState.db.rerankerConfig?.topK ?? 10}
+                        onChange={(e) => {
+                            ensureRerankerConfig();
+                            DBState.db.rerankerConfig.topK = e.currentTarget.valueAsNumber;
+                        }}
+                    />
+                </div>
+                
+                <!-- Max Tokens for Reranker -->
+                <div class="mb-1">
+                    <span class="text-textcolor2 text-sm">{language.rerankerMaxTokens ?? 'Max Tokens (Reranker)'}</span>
+                    <NumberInput 
+                        size="sm" 
+                        min={500} 
+                        max={10000} 
+                        value={DBState.db.rerankerConfig?.maxTokens ?? 2000}
+                        onChange={(e) => {
+                            ensureRerankerConfig();
+                            DBState.db.rerankerConfig.maxTokens = e.currentTarget.valueAsNumber;
+                        }}
+                    />
+                    <span class="text-textcolor2 text-xs ml-1">tokens</span>
+                </div>
+            {/if}
+        </div>
+    {/if}
 {/if}
 {#if submenu !== 2}
 

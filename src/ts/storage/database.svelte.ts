@@ -1282,6 +1282,21 @@ export interface Database {
     createFolderOnBranch?: boolean
     enableTypingEffect?: boolean
     typingEffectSound?: 'click' | 'sine' | 'none'
+    // LoreBook+ settings
+    lorebookPlusSettings?: {
+        embeddingThreshold: number;  // 0.0 - 1.0, similarity threshold for activation
+        maxEmbeddingResults: number; // Maximum lorebooks to consider via embedding
+        maxTokens?: number; // Maximum tokens for embedding (truncates if exceeded)
+    }
+    // Reranker configuration
+    rerankerConfig?: {
+        enabled: boolean;
+        url: string;
+        key?: string;
+        model?: string;
+        topK?: number; // Maximum documents to rerank
+        maxTokens?: number; // Maximum tokens for reranker (truncates if exceeded)
+    }
 }
 
 interface SeparateParameters {

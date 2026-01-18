@@ -11,6 +11,11 @@ import { downloadFile } from "../globalApi.svelte";
 import { getModuleLorebooks } from "./modules";
 import { CCardLib } from "@risuai/ccardlib";
 import { v4 } from "uuid";
+import { activateLorebooksByEmbedding, type LorebookPlusDebugResult } from "./lorebookPlus";
+
+// Store last LoreBook+ debug result for the test UI
+let lastLorebookPlusResult: LorebookPlusDebugResult | null = null;
+export function getLastLorebookPlusResult() { return lastLorebookPlusResult; }
 
 export function addLorebook(type:number) {
     const selectedID = get(selectedCharID)
@@ -85,6 +90,112 @@ export async function loadLoreBookV3Prompt(){
     const fullWordMatchingSetting = char.loreSettings?.fullWordMatching ?? false
     const chatLength = currentChat.length + 1 //includes first message
     const recursiveScanning = char.loreSettings?.recursiveScanning ?? true
+    
+    // ========== LoreBook+ Embedding-based Activation ==========
+    const useLorePlus = char.lorePlus === true;
+    
+    if (useLorePlus && currentChat.length > 0) {
+        try {
+            console.log('[LoreBook+] Using embedding-based activation');
+            const debugResult = await activateLorebooksByEmbedding(
+                currentChat,
+                fullLore,
+                loreDepth,
+                char.name
+            );
+            
+            // Store for debug UI
+            lastLorebookPlusResult = debugResult;
+            
+            // Convert activated lorebooks to the actives format
+            let actives: {
+                depth: number,
+                pos: string,
+                prompt: string
+                role: 'system' | 'user' | 'assistant'
+                order: number
+                tokens: number
+                priority: number
+                source: string
+                inject: {
+                    operation: 'append' | 'prepend' | 'replace',
+                    location: string,
+                    param: string
+                    lore: boolean
+                } | null
+            }[] = [];
+            
+            let usedTokens = 0;
+            
+            for (const result of debugResult.activatedLorebooks) {
+                const lore = result.lore;
+                
+                // Parse decorators like the original does
+                let pos = '';
+                let depth = 0;
+                let order = lore.insertorder;
+                let priority = result.rerankScore ?? result.similarityScore * 100; // Use rerank score if available
+                let role: 'system' | 'user' | 'assistant' = 'system';
+                let inject: {
+                    operation: 'append' | 'prepend' | 'replace',
+                    location: string,
+                    param: string
+                    lore: boolean
+                } | null = null;
+                
+                const content = CCardLib.decorator.parse(lore.content, (name, arg) => {
+                    switch(name){
+                        case 'end': pos = 'depth'; depth = 0; return;
+                        case 'depth':
+                        case 'reverse_depth':
+                            const int = parseInt(arg[0]);
+                            if(!Number.isNaN(int)) { depth = int; pos = name === 'depth' ? 'depth' : 'reverse_depth'; }
+                            return;
+                        case 'role':
+                            if(arg[0] === 'user' || arg[0] === 'assistant' || arg[0] === 'system') role = arg[0];
+                            return;
+                        case 'position':
+                            if(arg[0].startsWith('pt_') || ["after_desc", "before_desc", "personality", "scenario"].includes(arg[0])) pos = arg[0];
+                            return;
+                        case 'priority': priority = parseInt(arg[0]) || priority; return;
+                        default: return false;
+                    }
+                });
+                
+                const tokens = await tokenize(content);
+                
+                if (usedTokens + tokens <= loreToken) {
+                    usedTokens += tokens;
+                    actives.push({
+                        depth, pos, prompt: content, role, order,
+                        tokens, priority,
+                        source: lore.comment || `lorebook ${result.loreIndex}`,
+                        inject
+                    });
+                }
+            }
+            
+            // Sort by order (descending) for final output
+            const activesResorted = actives.sort((a, b) => b.order - a.order);
+            
+            console.log(`[LoreBook+] Activated ${activesResorted.length} lorebooks via embedding (${debugResult.embeddingTime.toFixed(0)}ms embed, ${debugResult.rerankTime.toFixed(0)}ms rerank)`);
+            
+            return {
+                actives: activesResorted.reverse(),
+                matchLog: debugResult.activatedLorebooks.map(r => ({
+                    prompt: r.lore.content?.substring(0, 100) || '',
+                    source: r.lore.comment || `lorebook ${r.loreIndex}`,
+                    activated: `[Embedding: ${(r.similarityScore * 100).toFixed(1)}%]${r.rerankScore ? ` [Rerank: ${(r.rerankScore * 100).toFixed(1)}%]` : ''}`
+                })),
+            };
+        } catch (error) {
+            console.error('[LoreBook+] Embedding activation failed, falling back to keyword matching:', error);
+            lastLorebookPlusResult = null;
+            // Fall through to keyword matching below
+        }
+    }
+    // ========== End LoreBook+ ==========
+    
     let recursivePrompt:{
         prompt: string,
         source: string,
