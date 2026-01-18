@@ -24,10 +24,6 @@ export default defineConfig(({ command, mode }) => {
 
     ],
 
-    define: {
-      'globalThis.__NODE__': mode === 'node' ? 'true' : 'undefined',
-    },
-
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     // prevent vite from obscuring rust errors
     clearScreen: false,
