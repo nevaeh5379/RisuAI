@@ -43,13 +43,9 @@
     }
     
 
-    const unsub = doingChat.subscribe(async (v) => {
-        if(v) {
-            progress=false
-            abortController?.abort()
-            suggestMessages = []
-        }
-        if(!v && $selectedCharID > -1 && (!suggestMessages || suggestMessages.length === 0) && !progress){
+
+    const generateSuggestions = async () => {
+        if($selectedCharID > -1 && !progress){
             let currentChar:character|groupChat = DBState.db.characters[$selectedCharID];
             let messages:Message[] = []
             
@@ -135,7 +131,15 @@
                 }
                 progress = false
             })
-            }
+        }
+    }
+
+    const unsub = doingChat.subscribe(async (v) => {
+        if(v) {
+            progress=false
+            abortController?.abort()
+            suggestMessages = []
+        }
     })
 
     const translateSuggest = async (toggle, messages)=>{
@@ -179,8 +183,7 @@
                         title={language.reroll}
                         onclick={() => {
                             suggestMessages = []
-                            doingChat.set(true)
-                            doingChat.set(false)
+                            generateSuggestions()
                         }}
                     >
                         <RefreshCcwIcon size={12}/>
@@ -217,8 +220,7 @@
                 class="text-xs text-textcolor2 hover:text-textcolor px-3 py-1.5 rounded-lg bg-textcolor2/30 hover:bg-textcolor2/50 transition-colors flex items-center gap-1"
                 onclick={() => {
                     suggestMessages = []
-                    doingChat.set(true)
-                    doingChat.set(false)
+                    generateSuggestions()
                 }}
             >
                 <RefreshCcwIcon size={12}/>

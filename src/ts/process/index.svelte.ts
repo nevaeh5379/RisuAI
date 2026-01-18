@@ -1701,7 +1701,10 @@ export async function sendChat(chatProcessIndex = -1,arg:{
 
     if(DBState.db.notification){
         try {
-            const permission = await Notification.requestPermission()
+            const permission = await Promise.race([
+                Notification.requestPermission(),
+                new Promise<NotificationPermission>(resolve => setTimeout(() => resolve('denied'), 2000))
+            ]);
             if(permission === 'granted'){
                 const noti = new Notification('Risuai', {
                     body: result
