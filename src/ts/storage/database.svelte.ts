@@ -718,6 +718,8 @@ export function setDatabase(data: Database) {
         data.promptInfoInsideChat = false
     }
     data.createFolderOnBranch ??= true
+    data.enableTypingEffect ??= false
+    data.typingEffectSound ??= 'click'
     changeLanguage(data.language)
     setDatabaseLite(data)
 }
@@ -1270,6 +1272,8 @@ export interface Database {
     echoMessage?: string
     echoDelay?: number
     createFolderOnBranch?: boolean
+    enableTypingEffect?: boolean
+    typingEffectSound?: 'click' | 'sine' | 'none'
 }
 
 interface SeparateParameters {

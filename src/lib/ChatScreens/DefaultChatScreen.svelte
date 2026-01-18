@@ -20,6 +20,7 @@
         BrainIcon,
         ArrowDown,
     } from "@lucide/svelte";
+    import { triggerTypingEffect, playSendSound } from "../../ts/gui/typingEffect";
     import {
         selectedCharID,
         PlaygroundStore,
@@ -202,6 +203,11 @@
     }
 
     async function sendMain(continueResponse: boolean) {
+        // Play send sound if typing effect is enabled
+        if (DBState.db.enableTypingEffect) {
+            playSendSound();
+        }
+        
         let selectedChar = $selectedCharID;
         if ($doingChat) {
             return;
@@ -858,9 +864,12 @@
                                     }
                                 }
                             }}
-                            oninput={() => {
+                            oninput={(e) => {
                                 updateInputSizeAll();
                                 updateInputTransateMessage(false);
+                                if (DBState.db.enableTypingEffect) {
+                                    triggerTypingEffect(e.currentTarget as HTMLElement, DBState.db.typingEffectSound || 'click');
+                                }
                             }}
                             style:height={inputHeight}
                         ></textarea>

@@ -183,6 +183,19 @@ export const advancedSettingsItems: SettingItem[] = [
     { id: 'adv.bookmark', type: 'check', labelKey: 'bookmark', bindKey: 'enableBookmark', classes: 'mt-4' },
     { id: 'adv.simpleTool', type: 'check', labelKey: 'simplifiedToolUse', bindKey: 'simplifiedToolUse', classes: 'mt-4' },
     { id: 'adv.tokCache', type: 'check', labelKey: 'useTokenizerCaching', bindKey: 'useTokenizerCaching', classes: 'mt-4' },
+    { id: 'adv.typingEffect', type: 'check', labelKey: 'enableTypingEffect', bindKey: 'enableTypingEffect', classes: 'mt-4' },
+    {
+        id: 'adv.typingEffectSound', type: 'select', labelKey: 'typingEffectSound', bindKey: 'typingEffectSound',
+        condition: (ctx) => ctx.db.enableTypingEffect,
+        options: {
+            selectOptions: [
+                { value: 'click', label: 'Click (Mechanical)' },
+                { value: 'sine', label: 'Sine (Soft)' },
+                { value: 'none', label: 'None (Visual Only)' }
+            ]
+        },
+        classes: 'mt-2'
+    },
     { id: 'adv.devMode', type: 'check', labelKey: 'pluginDevelopMode', bindKey: 'pluginDevelopMode', classes: 'mt-4' },
 
     // More Experimental (Condition: useExperimental)

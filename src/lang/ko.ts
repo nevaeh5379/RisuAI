@@ -555,6 +555,8 @@ export const languageKorean = {
     "presensePenalty": "프리센스 패널티",
     "localBackupMethod": "로컬 백업 방식",
     "localRestoreMethod": "로컬 복원 방식",
+    "enableTypingEffect": "타격감 이펙트",
+    "typingEffectSound": "타격감 소리 종류",
     "advancedSettings": "고급 설정",
     "advancedSettingsWarn": "어떤 설정인지 모르겠으면, 만지지 마세요!",
     "formatingOrder": "포맷 순서",

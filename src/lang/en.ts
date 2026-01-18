@@ -660,6 +660,8 @@ export const languageEnglish = {
     frequencyPenalty: "Frequency Penalty",
     presensePenalty: "Presense Penalty",
     localBackupMethod: "Local Backup Method",
+    enableTypingEffect: "Typing Impact Effect",
+    typingEffectSound: "Typing Sound Type",
     localRestoreMethod: "Local Restore Method",
     advancedSettings: "Advanced Settings",
     advancedSettingsWarn: "Warn: If you don't know what the option does, don't change it!",
