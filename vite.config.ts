@@ -24,6 +24,10 @@ export default defineConfig(({ command, mode }) => {
 
     ],
 
+    define: {
+      'globalThis.__NODE__': mode === 'node' ? 'true' : 'undefined',
+    },
+
     // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
     // prevent vite from obscuring rust errors
     clearScreen: false,
@@ -33,6 +37,12 @@ export default defineConfig(({ command, mode }) => {
       port: 5174,
       strictPort: true,
       // hmr: false,
+      proxy: mode === 'node' ? {
+        '/api': 'http://localhost:6001',
+        '/proxy': 'http://localhost:6001',
+        '/proxy2': 'http://localhost:6001',
+        '/hub-proxy': 'http://localhost:6001',
+      } : undefined
     },
     // to make use of `TAURI_ENV_DEBUG` and other env variables
     // https://v2.tauri.app/reference/environment-variables/

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:node": "vite --mode node",
     "build": "vite build --sourcemap",
     "tauribuild": "vite build",
     "preview": "vite preview",

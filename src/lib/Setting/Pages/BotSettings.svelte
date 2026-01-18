@@ -76,6 +76,8 @@ let tokens = $state({
     let submenu = $state(DBState.db.useLegacyGUI ? -1 : 0)
     let modelInfo = $derived(getModelInfo(DBState.db.aiModel))
     let subModelInfo = $derived(getModelInfo(DBState.db.subModel))
+    let subModelInfo1 = $derived(getModelInfo(DBState.db.subModel1))
+    let subModelInfo2 = $derived(getModelInfo(DBState.db.subModel2))
     let openrouterSearchQuery = $state("")
 </script>
 <h2 class="mb-2 text-2xl font-bold mt-2">{language.chatBot}</h2>
@@ -111,6 +113,12 @@ let tokens = $state({
 
     <span class="text-textcolor mt-2">{language.submodel} <Help key="submodel"/></span>
     <ModelList bind:value={DBState.db.subModel}/>
+
+    <span class="text-textcolor mt-2">{language.submodel1}</span>
+    <ModelList bind:value={DBState.db.subModel1}/>
+
+    <span class="text-textcolor mt-2">{language.submodel2}</span>
+    <ModelList bind:value={DBState.db.subModel2}/>
 
     {#if modelInfo.provider === LLMProvider.GoogleCloud || subModelInfo.provider === LLMProvider.GoogleCloud}
         <span class="text-textcolor">GoogleAI API Key</span>

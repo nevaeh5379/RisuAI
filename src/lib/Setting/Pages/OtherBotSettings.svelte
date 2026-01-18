@@ -144,10 +144,19 @@
       onclick={() => {
         submenu = 4;
       }}
-      class="p-2 flex-1"
+      class="p-2 flex-1 border-r border-darkborderc"
       class:bg-darkbutton={submenu === 4}
     >
       <span>{language.titleGeneration}</span>
+    </button>
+    <button
+      onclick={() => {
+        submenu = 5;
+      }}
+      class="p-2 flex-1"
+      class:bg-darkbutton={submenu === 5}
+    >
+      <span>{language.autoSuggest}</span>
     </button>
   </div>
 {/if}
@@ -182,6 +191,37 @@
       bind:value={DBState.db.titleGeneration.maxLength}
       min={1}
     />
+  </Accordion>
+{/if}
+
+{#if submenu === 5 || submenu === -1}
+  <Accordion name={language.autoSuggest} styled disabled={submenu !== -1}>
+    <div class="flex items-center mt-2 mb-4">
+      <CheckInput
+        bind:check={DBState.db.useAutoSuggestions}
+        name={language.enableAutoSuggest}
+      />
+    </div>
+
+    <span class="text-textcolor">{language.autoSuggest} {language.prompt} <Help key="autoSuggest" /></span>
+    <TextAreaInput
+      className="mt-2 mb-4"
+      bind:value={DBState.db.autoSuggestPrompt}
+    />
+
+    <span class="text-textcolor">{language.autoSuggestPrefix}</span>
+    <TextInput
+      size="sm"
+      marginBottom={true}
+      bind:value={DBState.db.autoSuggestPrefix}
+    />
+
+    <div class="flex items-center mt-2">
+      <CheckInput
+        bind:check={DBState.db.autoSuggestClean}
+        name={language.autoSuggestClean}
+      />
+    </div>
   </Accordion>
 {/if}
 

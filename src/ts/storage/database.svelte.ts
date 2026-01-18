@@ -153,6 +153,12 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.subModel)) {
         data.subModel = 'gemini-3-flash-preview'
     }
+    if (checkNullish(data.subModel1)) {
+        data.subModel1 = 'gemini-3-flash-preview'
+    }
+    if (checkNullish(data.subModel2)) {
+        data.subModel2 = 'gemini-3-flash-preview'
+    }
     if (checkNullish(data.timeOut)) {
         data.timeOut = 120
     }
@@ -850,6 +856,8 @@ export interface Database {
     iconsize: number
     theme: string
     subModel: string
+    subModel1: string
+    subModel2: string
     timeOut: number
     emotionPrompt: string,
     requester: string
@@ -1560,6 +1568,8 @@ export interface botPreset {
     formatingOrder: FormatingOrderItem[]
     aiModel?: string
     subModel?: string
+    subModel1?: string
+    subModel2?: string
     currentPluginProvider?: string
     textgenWebUIStreamURL?: string
     textgenWebUIBlockingURL?: string
@@ -2008,6 +2018,8 @@ export function saveCurrentPreset() {
         formatingOrder: db.formatingOrder,
         aiModel: db.aiModel,
         subModel: db.subModel,
+        subModel1: db.subModel1,
+        subModel2: db.subModel2,
         currentPluginProvider: db.currentPluginProvider,
         textgenWebUIStreamURL: db.textgenWebUIStreamURL,
         textgenWebUIBlockingURL: db.textgenWebUIBlockingURL,
@@ -2119,6 +2131,8 @@ export function setPreset(db: Database, newPres: botPreset) {
     db.formatingOrder = newPres.formatingOrder ?? db.formatingOrder
     db.aiModel = newPres.aiModel ?? db.aiModel
     db.subModel = newPres.subModel ?? db.subModel
+    db.subModel1 = newPres.subModel1 ?? db.subModel1
+    db.subModel2 = newPres.subModel2 ?? db.subModel2
     db.currentPluginProvider = newPres.currentPluginProvider ?? db.currentPluginProvider
     db.textgenWebUIStreamURL = newPres.textgenWebUIStreamURL ?? db.textgenWebUIStreamURL
     db.textgenWebUIBlockingURL = newPres.textgenWebUIBlockingURL ?? db.textgenWebUIBlockingURL

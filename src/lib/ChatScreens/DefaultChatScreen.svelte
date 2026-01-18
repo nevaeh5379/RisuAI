@@ -108,6 +108,10 @@
     let currentChat = $derived(
         currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [],
     );
+    let hasSuggestions = $derived(
+        !$doingChat && 
+        currentCharacter?.chats?.[currentCharacter.chatPage]?.suggestMessages?.length > 0
+    );
 
     function scrollToBottom() {
         chatsInstance?.scrollToLatestMessage();
@@ -767,18 +771,36 @@
             <div
                 class="{DBState.db.fixedChatTextarea
                     ? 'sticky pt-2 pb-2 right-0 bottom-0 bg-bgcolor'
-                    : 'mt-2 mb-2'} flex items-stretch w-full"
-                style={DBState.db.fixedChatTextarea ? "z-index:29;" : ""}
+                    : 'mt-2 mb-2'} w-full"
+                style="{DBState.db.fixedChatTextarea ? 'z-index:29;' : ''}"
             >
+                <div class="flex flex-col mx-4" style="width: calc(100% - 2rem);">
+                    <!-- Suggestion: position absolute 제거, 일반 flow 배치하여 높이 차지 -->
+                    <!-- -mb-1로 아래 요소(채팅창)와 약간 겹치게 하여 연결된 느낌 및 뒤로 숨김 효과 -->
+                    <!-- px-2 제거: 너비를 채팅창과 동일하게 맞춤 -->
+                    <div class="relative w-full z-0 -mb-2">
+                        <Suggestion
+                            messageInput={(msg) =>
+                                (messageInput =
+                                    (DBState.db.subModel === "textgen_webui" ||
+                                        DBState.db.subModel === "mancer" ||
+                                        DBState.db.subModel.startsWith("local_")) &&
+                                    DBState.db.autoSuggestClean
+                                        ? msg.replace(/ +\(.+?\) *$| - [^"'*]*?$/, "")
+                                        : msg)}
+                            {send}
+                        />
+                    </div>
+
+                    <!-- 채팅창 (relative, z-10, 배경색 있음) -> Suggestion 위를 덮음 -->
+                    <!-- rounded-md 추가: 컨테이너 배경이 둥근 버튼 뒤에서 직각으로 튀어나오는 것 방지 -->
+                    <div class="flex items-stretch relative z-10 bg-bgcolor w-full rounded-md mt-1">
                 {#if DBState.db.useChatSticker && currentCharacter.type !== "group"}
                     <div
                         onclick={() => {
                             toggleStickers = !toggleStickers;
                         }}
-                        class={"ml-4 bg-textcolor2 flex justify-center items-center  w-12 h-12 rounded-md hover:bg-green-500 transition-colors " +
-                            (toggleStickers
-                                ? "text-green-500"
-                                : "text-textcolor")}
+                        class={"bg-textcolor2 flex justify-center items-center w-12 h-12 rounded-l-md border border-r-0 border-darkborderc hover:bg-green-500 transition-colors " + (toggleStickers ? "text-green-500" : "text-textcolor")}
                     >
                         <Laugh />
                     </div>
@@ -786,7 +808,7 @@
 
                 {#if !DBState.db.useAdvancedEditor}
                     <textarea
-                            class="peer text-input-area focus:border-textcolor transition-colors outline-hidden text-textcolor p-2 min-w-0 border border-r-0 bg-transparent rounded-md rounded-r-none input-text text-xl grow ml-4 border-darkborderc resize-none overflow-y-hidden overflow-x-hidden max-w-full placeholder:text-sm"
+                            class="peer text-input-area focus:border-textcolor transition-colors outline-hidden text-textcolor p-2 min-w-0 {DBState.db.useChatSticker && currentCharacter.type !== 'group' ? 'border-y' : 'border border-r-0 rounded-l-md'} bg-transparent input-text text-xl grow border-darkborderc resize-none overflow-y-hidden overflow-x-hidden max-w-full placeholder:text-sm"
                             bind:value={messageInput}
                             bind:this={inputEle}
                             onkeydown={(e) => {
@@ -908,7 +930,7 @@
                             openMenu = !openMenu;
                             e.stopPropagation();
                         }}
-                        class="peer-focus:border-textcolor mr-2 flex border-y border-r border-darkborderc justify-center items-center text-gray-100 p-3 rounded-r-md hover:bg-blue-500 transition-colors"
+                        class="peer-focus:border-textcolor flex border border-l-0 border-darkborderc rounded-r-md justify-center items-center text-gray-100 p-3 hover:bg-blue-500 transition-colors"
                         style:height={inputHeight}
                     >
                         <MenuIcon />
@@ -931,12 +953,14 @@
                                     ].chatPage
                                 ];
                         }}
-                        class="peer-focus:border-textcolor mr-2 flex border-y border-r border-darkborderc justify-center items-center text-gray-100 p-3 rounded-r-md hover:bg-blue-500 transition-colors"
+                        class="peer-focus:border-textcolor flex border border-l-0 border-darkborderc rounded-r-md justify-center items-center text-gray-100 p-3 hover:bg-blue-500 transition-colors"
                         style:height={inputHeight}
                     >
-                        <Plus />
+                    <Plus />
                     </div>
                 {/if}
+                </div>
+            </div>
             </div>
             {#if DBState.db.useAutoTranslateInput && DBState.db.characters[$selectedCharID]?.chaId !== "§playground"}
                 <div class="flex items-center mt-2 mb-2">
@@ -1062,19 +1086,7 @@
                 </div>
             {/if}
 
-            {#if DBState.db.useAutoSuggestions}
-                <Suggestion
-                    messageInput={(msg) =>
-                        (messageInput =
-                            (DBState.db.subModel === "textgen_webui" ||
-                                DBState.db.subModel === "mancer" ||
-                                DBState.db.subModel.startsWith("local_")) &&
-                            DBState.db.autoSuggestClean
-                                ? msg.replace(/ +\(.+?\) *$| - [^"'*]*?$/, "")
-                                : msg)}
-                    {send}
-                />
-            {/if}
+        
 
             {#if DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message?.[0]?.data?.startsWith(coldStorageHeader)}
                 {#await preLoadChat($selectedCharID, DBState.db.characters[$selectedCharID].chatPage)}

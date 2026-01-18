@@ -10,6 +10,7 @@
     import { language } from "src/lang";
     import { getUserName, replacePlaceholders } from "../../ts/util";
     import { onDestroy } from 'svelte';
+    import { slide } from 'svelte/transition';
     import { ParseMarkdown } from "src/ts/parser.svelte";
     import {defaultAutoSuggestPrompt} from "../../ts/storage/defaultPrompts.js";
 
@@ -120,60 +121,59 @@
     $effect.pre(() => {translateSuggest(toggleTranslate, suggestMessages)});
 </script>
 
-<div class="ml-4 flex flex-wrap">
+<div class="w-full">
     {#if progress}
-        <div class="flex bg-textcolor2 p-2 rounded-lg items-center">
-            <div class="loadmove mx-2"></div>
-            <div>{language.creatingSuggestions}</div>
-        </div>        
-    {:else if !$doingChat}
-        {#if DBState.db.translator !== ''}
-            <div class="flex mr-2 mb-2">
-                <button class={"bg-textcolor2 hover:bg-darkbutton font-bold py-2 px-4 rounded-sm " + (toggleTranslate ? 'text-green-500' : 'text-textcolor')}
+        <div class="flex items-center justify-center py-2 text-textcolor2 text-sm border border-b-0 border-darkborderc rounded-t-lg bg-bgcolor">
+            <div class="loadmove mr-2"></div>
+            <span>{language.creatingSuggestions}</span>
+        </div>
+    {:else if !$doingChat && suggestMessages && suggestMessages.length > 0}
+        <div 
+            class="p-3 border border-b-0 border-darkborderc rounded-t-lg bg-bgcolor overflow-hidden"
+            transition:slide={{ duration: 200 }}
+        >
+            <div class="text-xs text-textcolor2 mb-2 flex items-center justify-between">
+                <span>{language.autoSuggest}</span>
+                <button 
+                    class="hover:text-textcolor transition-colors"
                     onclick={() => {
-                        toggleTranslate = !toggleTranslate
+                        suggestMessages = []
+                        doingChat.set(true)
+                        doingChat.set(false)
                     }}
                 >
-                    <LanguagesIcon/>
-                </button>
-            </div>    
-        {/if}
-        
-
-        <div class="flex mr-2 mb-2">
-            <button class="bg-textcolor2 hover:bg-darkbutton font-bold py-2 px-4 rounded-sm text-textcolor"
-                onclick={() => {
-                    alertConfirm(language.askReRollAutoSuggestions).then((result) => {
-                        if(result) {
-                            suggestMessages = []
-                            doingChat.set(true)
-                            doingChat.set(false)        
-                        }
-                    })
-                }}
-            >
-                <RefreshCcwIcon/>
-            </button>
-        </div>
-        {#each suggestMessages??[] as suggest, i}
-            <div class="flex mr-2 mb-2">
-                <button class="bg-textcolor2 hover:bg-darkbutton text-textcolor font-bold py-2 px-4 rounded-sm" onclick={() => {
-                    suggestMessages = []
-                    messageInput(suggest)
-                    send()
-                }}>
-                {#await ParseMarkdown((DBState.db.translator !== '' && toggleTranslate && suggestMessagesTranslated && suggestMessagesTranslated.length > 0) ? suggestMessagesTranslated[i]??suggest : suggest) then md}
-                    {@html md}
-                {/await}
-                </button>
-                <button class="bg-textcolor2 hover:bg-darkbutton text-textcolor font-bold py-2 px-4 rounded-sm ml-1" onclick={() => {
-                    messageInput(suggest)
-                }}>
-                    <CopyIcon/>
+                    <RefreshCcwIcon size={12}/>
                 </button>
             </div>
-        {/each}
-        
+            <ul class="space-y-1">
+                {#each (suggestMessages??[]).slice(0, 4) as suggest, i}
+                    <li 
+                        class="text-sm text-textcolor cursor-pointer hover:text-green-400 transition-colors py-0.5 pl-2 border-l-2 border-transparent hover:border-green-400"
+                        onclick={() => {
+                            suggestMessages = []
+                            messageInput(suggest)
+                            send()
+                        }}
+                    >
+                        {DBState.db.translator !== '' && toggleTranslate && suggestMessagesTranslated && suggestMessagesTranslated.length > 0 ? suggestMessagesTranslated[i]??suggest : suggest}
+                    </li>
+                {/each}
+            </ul>
+        </div>
+    {:else if !$doingChat}
+        <div class="flex justify-center py-2">
+            <button 
+                class="text-xs text-textcolor2 hover:text-textcolor px-3 py-1.5 rounded-lg bg-textcolor2/30 hover:bg-textcolor2/50 transition-colors flex items-center gap-1"
+                onclick={() => {
+                    suggestMessages = []
+                    doingChat.set(true)
+                    doingChat.set(false)
+                }}
+            >
+                <RefreshCcwIcon size={12}/>
+                <span>{language.generateSuggestions}</span>
+            </button>
+        </div>
     {/if}
 </div>
 
