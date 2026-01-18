@@ -584,6 +584,7 @@
         <span
             class="text chat-width chattext prose minw-0"
             class:prose-invert={$ColorSchemeTypeStore}
+            class:focus-mode={DBState.db.focusMode}
             bind:this={bodyRoot}
             onclick={() => {
                 if (DBState.db.clickToEdit && idx > -1) {

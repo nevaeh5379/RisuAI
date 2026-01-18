@@ -18,6 +18,13 @@ export const accessibilitySettingsItems: SettingItem[] = [
     
     // Checkboxes
     {
+        id: 'acc.focusMode',
+        type: 'check',
+        labelKey: 'focusMode',
+        bindKey: 'focusMode',
+        keywords: ['focus', 'mode', 'width', 'limit']
+    },
+    {
         id: 'acc.askRemoval',
         type: 'check',
         labelKey: 'askRemoval',

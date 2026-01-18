@@ -7,7 +7,9 @@
     import Button from "src/lib/UI/GUI/Button.svelte";
     import NumberInput from "src/lib/UI/GUI/NumberInput.svelte";
     import CheckInput from "src/lib/UI/GUI/CheckInput.svelte";
-    import { XIcon, SettingsIcon, ListFilterIcon, ImageDownIcon, LayersIcon, PaletteIcon, ScanSearchIcon, MousePointerClickIcon, ChevronRightIcon, ChevronDownIcon, FolderIcon, FolderOpenIcon, SlidersIcon, EyeIcon, SparklesIcon } from "@lucide/svelte";
+    import ChatBody from "./ChatBody.svelte";
+    import { risuChatParser } from "src/ts/process/scripts";
+    import { XIcon, SettingsIcon, ListFilterIcon, ImageDownIcon, LayersIcon, PaletteIcon, ScanSearchIcon, MousePointerClickIcon, ChevronRightIcon, ChevronDownIcon, FolderIcon, FolderOpenIcon, SlidersIcon, EyeIcon, SparklesIcon, SmartphoneIcon, MonitorIcon, ScalingIcon, MaximizeIcon, MinimizeIcon } from "@lucide/svelte";
     import { createSimpleCharacter } from "src/ts/stores.svelte";
     import { tick } from "svelte";
     import { sleep } from "src/ts/util";
@@ -30,7 +32,9 @@
     let exportContainer = $state<HTMLElement>();
     let loading = $state(false);
     let loadingMessage = $state('Processing...');
+    
     let currentTab = $state<Tab>('settings');
+    let mobileView = $state<'settings' | 'preview'>('settings');
 
     let char = $derived(DBState.db.characters?.[$selectedCharID]);
     let chat = $derived(char?.chats[char.chatPage]);
@@ -56,10 +60,24 @@
     
     // Inspector & Filtering
     let classTree = $state<ClassNode[]>([]);
+    let _dummyBool = $state(false);
     let hiddenClasses = $state(new Set<string>());
     
     let inspectorMode = $state(false);
     let highlightedElement = $state<HTMLElement | null>(null);
+
+    // Auto-fit Logic
+    let messageElements = $state<HTMLElement[]>([]);
+    let previewAreaWidth = $state(0);
+    let contentHeight = $state(0);
+    let autoFit = $state(true);
+    let fitScale = $derived.by(() => {
+        if (!autoFit || !previewAreaWidth || previewAreaWidth <= 0) return 1;
+        const padding = 36; // 32px (1rem*2) + safety buffer
+        const available = previewAreaWidth - padding;
+        if (available >= exportWidth) return 1;
+        return Math.max(0.1, available / exportWidth);
+    });
 
     // --- Effects ---
     
@@ -474,11 +492,31 @@
 {#if $exportModalStore.open && chat}
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="export-modal-overlay" onclick={close}>
+<div class="export-modal-overlay" onclick={close} role="dialog" aria-modal="true" tabindex="-1">
     <div class="export-modal-container" onclick={e => e.stopPropagation()}>
         
+        <!-- Mobile View Toggler (Only visible on mobile) -->
+        <div class="mobile-nav">
+            <button 
+                class="mobile-nav-btn" 
+                class:active={mobileView === 'settings'}
+                onclick={() => mobileView = 'settings'}
+            >
+                <SlidersIcon size={16} />
+                <span>Settings ⚙️</span>
+            </button>
+            <button 
+                class="mobile-nav-btn" 
+                class:active={mobileView === 'preview'}
+                onclick={() => mobileView = 'preview'}
+            >
+                <EyeIcon size={16} />
+                <span>Preview 🖼️</span>
+            </button>
+        </div>
+
         <!-- Sidebar (Left) -->
-        <div class="export-sidebar">
+        <div class="export-sidebar" class:hidden-mobile={mobileView === 'preview'}>
             <!-- Sidebar Header -->
             <div class="export-sidebar-header">
                 <div class="export-title-row">
@@ -486,12 +524,12 @@
                         <ImageDownIcon size={24} />
                     </div>
                     <div class="export-title-text">
-                        <h2>Export Logs</h2>
-                        <p>Capture your conversation</p>
+                        <h2>Export Logs 📤</h2>
+                        <p>Share your story!</p>
                     </div>
                 </div>
 
-                <!-- Modern Tabs -->
+                <!-- Tabs -->
                 <div class="export-tabs">
                     <button 
                         class="export-tab"
@@ -499,7 +537,7 @@
                         onclick={() => currentTab = 'settings'}
                     >
                         <SlidersIcon size={15} />
-                        <span>Settings</span>
+                        <span>Config 🛠️</span>
                     </button>
                     <button 
                         class="export-tab"
@@ -507,7 +545,7 @@
                         onclick={() => currentTab = 'filters'}
                     >
                         <LayersIcon size={15} />
-                        <span>Filters</span>
+                        <span>Filters 🧹</span>
                     </button>
                 </div>
             </div>
@@ -517,58 +555,58 @@
                 
                 {#if currentTab === 'settings'}
                     <!-- Section: Range -->
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2 text-textcolor/90 font-semibold text-sm">
+                    <div class="setting-group">
+                        <div class="setting-header">
                             <ListFilterIcon size={16} />
-                            <span>Message Range</span>
+                            <span>Message Range 📏</span>
                         </div>
                         
-                        <div class="bg-darkinput/30 p-3 rounded-md border border-darkborderc/50 flex flex-col gap-3">
-                            <div class="flex justify-between items-center text-xs">
-                                <span class="text-textcolor2">Start Index</span>
+                        <div class="setting-card">
+                            <div class="setting-row">
+                                <span class="label">Start Index</span>
                                 <NumberInput size="sm" min={0} max={messages.length - 1} bind:value={startIndex} />
                             </div>
-                            <div class="flex justify-between items-center text-xs">
-                                <span class="text-textcolor2">End Index</span>
+                            <div class="setting-row">
+                                <span class="label">End Index</span>
                                 <NumberInput size="sm" min={0} max={messages.length - 1} bind:value={endIndex} />
                             </div>
                             
-                            <div class="grid grid-cols-3 gap-1 mt-1">
-                                <Button size="sm" styled="outlined" className="w-full" onclick={() => {
+                            <div class="grid grid-cols-3 gap-2 mt-2">
+                                <Button size="sm" styled="outlined" className="w-full text-xs" onclick={() => {
                                     startIndex = $exportModalStore.initialIndex;
                                     endIndex = $exportModalStore.initialIndex;
-                                }}>Current</Button>
-                                <Button size="sm" styled="outlined" className="w-full" onclick={() => endIndex = messages.length - 1}>To End</Button>
-                                <Button size="sm" styled="outlined" className="w-full" onclick={() => { startIndex = 0; endIndex = messages.length - 1; }}>All</Button>
+                                }}>Current 📍</Button>
+                                <Button size="sm" styled="outlined" className="w-full text-xs" onclick={() => endIndex = messages.length - 1}>To End ⏩</Button>
+                                <Button size="sm" styled="outlined" className="w-full text-xs" onclick={() => { startIndex = 0; endIndex = messages.length - 1; }}>All 📚</Button>
                             </div>
-                            <div class="text-center text-[10px] text-textcolor2">
-                                Selected: {displayMessages.length} messages
+                            <div class="text-center text-[10px] text-textcolor2 mt-1">
+                                Selected: <span class="text-primary font-bold">{displayMessages.length}</span> messages
                             </div>
                         </div>
                     </div>
 
                     <!-- Section: Appearance -->
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2 text-textcolor/90 font-semibold text-sm">
+                    <div class="setting-group">
+                        <div class="setting-header">
                             <PaletteIcon size={16} />
-                            <span>Image Settings</span>
+                            <span>Appearance 🎨</span>
                         </div>
 
-                        <div class="bg-darkinput/30 p-3 rounded-md border border-darkborderc/50 flex flex-col gap-3">
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-textcolor2">Image Width (px)</span>
+                        <div class="setting-card">
+                            <div class="setting-row">
+                                <span class="label">Width (px)</span>
                                 <div class="w-24">
                                     <NumberInput size="sm" min={400} max={3000} bind:value={exportWidth} />
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-textcolor2">Font Size (px)</span>
+                            <div class="setting-row">
+                                <span class="label">Font Size</span>
                                 <div class="w-24">
                                     <NumberInput size="sm" min={10} max={64} bind:value={fontSize} />
                                 </div>
                             </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-xs text-textcolor2">UI Scale</span>
+                            <div class="setting-row">
+                                <span class="label">UI Scale 🔍</span>
                                 <div class="flex items-center gap-2">
                                     <input 
                                         type="range" 
@@ -576,106 +614,98 @@
                                         max="2" 
                                         step="0.1" 
                                         bind:value={uiScale}
-                                        class="w-16 h-1 bg-darkborderc rounded-full appearance-none cursor-pointer"
+                                        class="scale-slider"
                                     />
-                                    <span class="text-xs text-textcolor font-mono w-10">{uiScale.toFixed(1)}x</span>
+                                    <span class="scale-value">{uiScale.toFixed(1)}x</span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Section: Header & Footer -->
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2 text-textcolor/90 font-semibold text-sm">
+                    <div class="setting-group">
+                        <div class="setting-header">
                             <SparklesIcon size={16} />
-                            <span>Header & Footer</span>
+                            <span>Extras ✨</span>
                         </div>
 
-                        <div class="bg-darkinput/30 p-3 rounded-md border border-darkborderc/50 flex flex-col gap-3">
-                            <CheckInput name="Show Header" bind:check={showHeader}>
-                                <p class="text-[10px] text-textcolor2 mt-0.5 ml-7">Display character info at top.</p>
-                            </CheckInput>
-                            <CheckInput name="Show Footer" bind:check={showFooter}>
-                                <p class="text-[10px] text-textcolor2 mt-0.5 ml-7">Display watermark at bottom.</p>
-                            </CheckInput>
+                        <div class="setting-card">
+                            <CheckInput name="Show Header 👤" bind:check={showHeader} />
+                            <CheckInput name="Show Footer 📝" bind:check={showFooter} />
+                            
                             {#if showFooter}
-                                <div class="flex flex-col gap-1 ml-7">
-                                    <span class="text-[10px] text-textcolor2">Footer Text</span>
+                                <div class="pl-7 pt-1">
                                     <input 
                                         type="text" 
-                                        class="w-full bg-darkinput border border-darkborderc rounded px-2 py-1 text-xs text-textcolor"
+                                        class="fancy-input"
                                         bind:value={footerText}
                                         placeholder="Exported from RisuAI"
                                     />
-                            </div>
+                                </div>
                             {/if}
-                            <div class="w-full h-px bg-darkborderc/30 my-1"></div>
+
+                            <div class="divider"></div>
+
                             <div class="flex flex-col gap-2">
-                                <span class="text-xs text-textcolor2">Message Theme</span>
+                                <span class="label">Design Style 🎭</span>
                                 <div class="grid grid-cols-2 gap-2">
                                     <button 
-                                        class="px-3 py-2 rounded-md text-xs font-medium transition-all border {!useModernDesign ? 'bg-primary/20 border-primary text-primary' : 'bg-darkinput border-darkborderc text-textcolor2 hover:border-textcolor2'}"
+                                        class="style-btn"
+                                        class:selected={!useModernDesign}
                                         onclick={() => useModernDesign = false}
                                     >
-                                        📝 일반 (Original)
+                                        Classic 📜
                                     </button>
                                     <button 
-                                        class="px-3 py-2 rounded-md text-xs font-medium transition-all border {useModernDesign ? 'bg-primary/20 border-primary text-primary' : 'bg-darkinput border-darkborderc text-textcolor2 hover:border-textcolor2'}"
+                                        class="style-btn"
+                                        class:selected={useModernDesign}
                                         onclick={() => useModernDesign = true}
                                     >
-                                        ✨ 모던 (Bubble)
+                                        Modern 💎
                                     </button>
                                 </div>
-                                <p class="text-[10px] text-textcolor2">
-                                    {useModernDesign ? 'Glassmorphism bubble style with gradients.' : 'Uses the original RisuAI message rendering.'}
-                                </p>
                             </div>
                         </div>
                     </div>
 
                 {:else if currentTab === 'filters'}
                     <!-- Section: Inspector -->
-                    <div class="flex flex-col gap-3">
-                        <div class="flex items-center gap-2 text-textcolor/90 font-semibold text-sm">
+                    <div class="setting-group">
+                        <div class="setting-header">
                             <EyeIcon size={16} />
-                            <span>Visual Inspector</span>
+                            <span>Inspector 🕵️</span>
                         </div>
-                         <div class="bg-darkinput/30 p-3 rounded-md border border-darkborderc/50">
+                         <div class="setting-card">
                             <Button 
                                 styled={inspectorMode ? "primary" : "outlined"} 
                                 className="w-full flex items-center justify-center gap-2" 
                                 onclick={toggleInspector}
                             >
                                 <MousePointerClickIcon size={16} />
-                                {inspectorMode ? 'Inspector Active' : 'Enable Inspector'}
+                                {inspectorMode ? 'Inspector Active! Click UI' : 'Start Selecting mode'}
                             </Button>
                             <p class="text-[10px] text-textcolor2 mt-2 text-center">
-                                {inspectorMode ? 'Click elements in the preview to hide them.' : 'Click to visually select and hide elements.'}
+                                {inspectorMode ? 'Click any element in preview to hide it!' : 'Toggle to click-and-hide unwanted elements.'}
                             </p>
                          </div>
                     </div>
 
                     <!-- Section: Class Tree -->
-                    <div class="flex flex-col gap-3 h-full overflow-hidden">
-                        <div class="flex items-center gap-2 text-textcolor/90 font-semibold text-sm">
+                    <div class="setting-group flex-grow overflow-hidden">
+                        <div class="setting-header">
                             <LayersIcon size={16} />
-                            <span>Element Tree</span>
+                            <span>Elements 🌳</span>
                         </div>
 
-                        <div class="bg-darkinput/30 p-3 rounded-md border border-darkborderc/50 flex flex-col gap-3 h-full overflow-hidden">
-                            <CheckInput name="Text Only (Strip HTML)" bind:check={stripHtml}>
-                                <p class="text-[10px] text-textcolor2 mt-0.5 ml-7">Removes all formatting/styles.</p>
-                            </CheckInput>
+                        <div class="setting-card h-full flex flex-col overflow-hidden">
+                            <CheckInput name="Text Only (No Styles) 📄" bind:check={stripHtml} />
+                            <CheckInput name="Show All Classes 🧩" bind:check={showAdvanced} />
                             
-                            <CheckInput name="Show Advanced (Non-Bot Styles)" bind:check={showAdvanced}>
-                                <p class="text-[10px] text-textcolor2 mt-0.5 ml-7">Show all HTML elements/classes.</p>
-                            </CheckInput>
-                            
-                            <div class="w-full h-px bg-darkborderc/30 my-1 shrink-0"></div>
+                            <div class="divider"></div>
 
-                            <div class="flex flex-col gap-1 overflow-y-auto pr-1 flex-grow">
+                            <div class="tree-container">
                                 {#if classTree.length === 0}
-                                    <span class="text-xs text-textcolor2/50 italic p-2">No elements found...</span>
+                                    <span class="empty-tree">No elements found...</span>
                                 {:else}
                                     {#each classTree as node}
                                         {@render treeNode(node)}
@@ -690,130 +720,178 @@
 
             <!-- Sidebar Footer -->
             <div class="export-sidebar-footer">
-                <button class="export-btn export-btn-secondary" onclick={close}>Cancel</button>
-                <button class="export-btn export-btn-primary" onclick={exportImage} disabled={loading}>
+                <button class="export-btn-cancel" onclick={close}>Close ❌</button>
+                <button class="export-btn-action" onclick={exportImage} disabled={loading}>
                     {#if loading}
                         <span class="export-btn-loading"></span>
                         {loadingMessage}
                     {:else}
                         <ImageDownIcon size={16} />
-                        Export PNG
+                        Export PNG 📸
                     {/if}
                 </button>
             </div>
         </div>
 
         <!-- Preview Area (Right) -->
-        <div class="export-preview-area">
+        <div class="export-preview-area" class:hidden-mobile={mobileView === 'settings'}>
             {#if inspectorMode}
-                <div class="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-red-500/80 text-white px-4 py-2 rounded-full shadow-lg backdrop-blur-md border border-white/10 flex items-center gap-2 animate-bounce pointer-events-none">
+                <div class="inspector-badge">
                     <MousePointerClickIcon size={16} />
-                    <span class="text-sm font-bold">Inspector Active</span>
+                    <span>Click to Hide!</span>
                 </div>
             {/if}
-
-            <div class="absolute top-4 right-4 z-10 bg-black/50 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 pointer-events-none">
-                <span class="text-xs font-mono text-white/80">Preview Mode</span>
+            <div class="absolute top-4 left-4 z-10 flex gap-2 pointer-events-none">
+                <button 
+                    class="bg-black/50 px-3 py-1 rounded-full backdrop-blur-md border border-white/10 pointer-events-auto flex items-center gap-1.5 transition-colors hover:bg-black/70"
+                    onclick={() => autoFit = !autoFit}
+                >
+                    {#if autoFit}
+                        <MinimizeIcon size={12} class="text-white/80" />
+                        <span class="text-xs font-mono text-white/80">Fit: ON</span>
+                    {:else}
+                        <MaximizeIcon size={12} class="text-white/80" />
+                        <span class="text-xs font-mono text-white/80">Fit: OFF</span>
+                    {/if}
+                </button>
             </div>
 
-            <div class="p-8 min-h-full flex justify-center items-start"
+            <div class="preview-badge">
+                <span class="text-xs font-mono text-white/80">PREVIEW MODE</span>
+            </div>
+
+            <div class="preview-scroller"
+                 bind:clientWidth={previewAreaWidth}
                  class:cursor-crosshair={inspectorMode}>
-                <!-- Export Target Container -->
-                <!-- svelte-ignore a11y_click_events_have_key_events -->
-                <!-- svelte-ignore a11y_no_static_element_interactions -->
-                <!-- svelte-ignore a11y_mouse_events_have_key_events -->
-                <div id="export-preview" 
-                     bind:this={exportContainer} 
-                     class="flex flex-col shrink-0 transition-all duration-200 overflow-hidden"
-                     class:export-modern={useModernDesign}
-                     class:export-classic={!useModernDesign}
-                     style="width: {exportWidth}px;"
-                     onmouseover={handleMouseOver}
-                     onmouseout={handleMouseOut}
-                     onclick={handleClick}>
-                     
-                     <!-- Inner Content Wrapper with zoom -->
-                     <div class="export-content-wrapper" style="font-size: {fontSize}px; zoom: {uiScale};">
-                     
-                     <!-- Header Section -->
-                     {#if showHeader && char}
-                         <div class="export-header">
-                             <div class="export-header-content">
-                                 {#await getFileSrc(char.image)}
-                                     <div class="export-header-avatar"></div>
-                                 {:then imgSrc}
-                                     <div class="export-header-avatar" style="background-image: url('{imgSrc}');"></div>
-                                 {/await}
-                                 <div class="export-header-info">
-                                     <h2 class="export-header-name">{char.name}</h2>
-                                     <p class="export-header-meta">
-                                         {chat?.name || new Date().toLocaleDateString()}
-                                         <span class="export-header-count">• {displayMessages.length} messages</span>
-                                     </p>
-                                 </div>
-                             </div>
-                         </div>
-                     {/if}
-                     
-                     <!-- Messages Container -->
-                     <div class="export-messages" style="font-size: {fontSize}px;">
-                         {#each displayMessages as msg, i}
-                             <div class="export-message" class:export-message-user={msg.role === 'user'}>
-                                 {#if useModernDesign}
-                                     <!-- Modern Design: Custom message bubble -->
-                                     <div class="export-bubble-wrapper" class:export-bubble-right={msg.role === 'user'}>
-                                         {#if msg.role !== 'user'}
-                                             {#await getFileSrc(char.image)}
-                                                 <div class="export-avatar"></div>
-                                             {:then imgSrc}
-                                                 <div class="export-avatar" style="background-image: url('{imgSrc}');"></div>
-                                             {/await}
-                                         {/if}
-                                         <div class="export-bubble" class:export-bubble-char={msg.role === 'char'} class:export-bubble-user-style={msg.role === 'user'}>
-                                             <div class="export-bubble-name">{msg.name}</div>
-                                             <div class="export-bubble-content">{@html cleanMessage(msg.data)}</div>
-                                         </div>
-                                         {#if msg.role === 'user'}
-                                             {#await getFileSrc(DBState.db.userIcon || '')}
-                                                 <div class="export-avatar export-avatar-user"></div>
-                                             {:then imgSrc}
-                                                 {#if imgSrc}
-                                                     <div class="export-avatar export-avatar-user" style="background-image: url('{imgSrc}');"></div>
-                                                 {:else}
-                                                     <div class="export-avatar export-avatar-user export-avatar-placeholder">👤</div>
-                                                 {/if}
-                                             {/await}
-                                         {/if}
-                                     </div>
-                                 {:else}
-                                     <!-- Classic Design: Use Chat component -->
-                                     <Chat 
-                                         message={cleanMessage(msg.data)}
-                                         name={msg.name}
-                                         role={msg.role}
-                                         idx={i + startIndex}
-                                         isLastMemory={false} 
-                                         disabled={msg.disabled}
-                                         character={createSimpleCharacter(char)}
-                                         img={getFileSrc(msg.role === 'char' ? char.image : DBState.db.userIcon).then(url => 
-                                             url ? `background-image: url('${url}');background-size: cover;background-position: center;` : ''
-                                         )}
-                                       
-                                     />
-                                 {/if}
-                             </div>
-                         {/each}
-                     </div>
-                     
-                     <!-- Footer Section -->
-                     {#if showFooter}
-                         <div class="export-footer">
-                             <span class="export-footer-text">{footerText}</span>
-                             <span class="export-footer-date">{new Date().toLocaleDateString()}</span>
-                         </div>
-                     {/if}
-                     
-                     </div><!-- end export-content-wrapper -->
+                
+                <!-- Wrapper to enforce layout bounds on scaled content -->
+                <div class="export-wrapper" style="width: {exportWidth * fitScale}px; height: {contentHeight * fitScale}px; margin: 0 auto;">
+                    <!-- Export Target Container -->
+                    <!-- svelte-ignore a11y_click_events_have_key_events -->
+                    <!-- svelte-ignore a11y_no_static_element_interactions -->
+                    <!-- svelte-ignore a11y_mouse_events_have_key_events -->
+                    <div id="export-preview" 
+                        bind:this={exportContainer} 
+                        bind:clientHeight={contentHeight}
+                        class="flex flex-col shrink-0 transition-all duration-200 overflow-hidden"
+                        class:export-modern={useModernDesign}
+                        class:export-classic={!useModernDesign}
+                        style="width: {exportWidth}px; transform: scale({fitScale}); transform-origin: top left;"
+                        onmouseover={handleMouseOver}
+                        onmouseout={handleMouseOut}
+                        onclick={handleClick}>
+                        
+                        <!-- Inner Content Wrapper with zoom -->
+                        <div class="export-content-wrapper" style="font-size: {fontSize}px; zoom: {uiScale};">
+                        
+                        <!-- Header Section -->
+                        {#if showHeader && char}
+                            <div class="export-header">
+                                <div class="export-header-content">
+                                    {#await getFileSrc(char.image)}
+                                        <div class="export-header-avatar"></div>
+                                    {:then imgSrc}
+                                        <div class="export-header-avatar" style="background-image: url('{imgSrc}');"></div>
+                                    {/await}
+                                    <div class="export-header-info">
+                                        <h2 class="export-header-name">{char.name}</h2>
+                                        <p class="export-header-meta">
+                                            {chat?.name || new Date().toLocaleDateString()}
+                                            <span class="export-header-count">• {displayMessages.length} msgs</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {/if}
+                        
+                        <!-- Messages Container -->
+                        <div class="export-messages" style="font-size: {fontSize}px;">
+                            {#each displayMessages as msg, i}
+                                <div class="export-message" class:export-message-user={msg.role === 'user'}>
+                                    {#if useModernDesign}
+                                        <!-- Modern Design: Custom message bubble -->
+                                        <div class="export-bubble-wrapper" class:export-bubble-right={msg.role === 'user'}>
+                                            {#if msg.role !== 'user'}
+                                                {#await getFileSrc(char.image)}
+                                                    <div class="export-avatar"></div>
+                                                {:then imgSrc}
+                                                    <div class="export-avatar" style="background-image: url('{imgSrc}');"></div>
+                                                {/await}
+                                            {/if}
+                                            <div class="export-bubble" class:export-bubble-char={msg.role === 'char'} class:export-bubble-user-style={msg.role === 'user'}>
+                                            <div class="export-bubble-name">{msg.name}</div>
+                                            <!-- svelte-ignore a11y_click_events_have_key_events -->
+                                            <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                            <div 
+                                                class="export-bubble-content chattext prose prose-invert max-w-none"
+                                                bind:this={messageElements[i]}
+                                            >
+                                                <ChatBody 
+                                                    character={createSimpleCharacter(char)}
+                                                    idx={i + startIndex}
+                                                    firstMessage={i + startIndex === 0}
+                                                    msgDisplay={risuChatParser(msg.data, {
+                                                        chara: char.name,
+                                                        chatID: i + startIndex,
+                                                        rmVar: true,
+                                                        visualize: true,
+                                                        cbsConditions: {
+                                                            firstmsg: i + startIndex === 0,
+                                                            chatRole: msg.role
+                                                        }
+                                                    })}
+                                                    name={msg.name}
+                                                    role={msg.role}
+                                                    bind:translated={_dummyBool}
+                                                    bind:translating={_dummyBool}
+                                                    bind:retranslate={_dummyBool}
+                                                    bodyRoot={messageElements[i]}
+                                                    modelShortName=""
+                                                />
+                                            </div>
+                                        </div>
+                                            {#if msg.role === 'user'}
+                                                {#await getFileSrc(DBState.db.userIcon || '')}
+                                                    <div class="export-avatar export-avatar-user"></div>
+                                                {:then imgSrc}
+                                                    {#if imgSrc}
+                                                        <div class="export-avatar export-avatar-user" style="background-image: url('{imgSrc}');"></div>
+                                                    {:else}
+                                                        <div class="export-avatar export-avatar-user export-avatar-placeholder">👤</div>
+                                                    {/if}
+                                                {/await}
+                                            {/if}
+                                        </div>
+                                    {:else}
+                                        <!-- Classic Design: Use Chat component -->
+                                        <Chat 
+                                            message={cleanMessage(msg.data)}
+                                            name={msg.name}
+                                            role={msg.role}
+                                            idx={i + startIndex}
+                                            isLastMemory={false} 
+                                            disabled={msg.disabled}
+                                            character={createSimpleCharacter(char)}
+                                            img={getFileSrc(msg.role === 'char' ? char.image : DBState.db.userIcon).then(url => 
+                                                url ? `background-image: url('${url}');background-size: cover;background-position: center;` : ''
+                                            )}
+                                        
+                                        />
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                        
+                        <!-- Footer Section -->
+                        {#if showFooter}
+                            <div class="export-footer">
+                                <span class="export-footer-text">{footerText}</span>
+                                <span class="export-footer-date">{new Date().toLocaleDateString()}</span>
+                            </div>
+                        {/if}
+                        
+                        </div><!-- end export-content-wrapper -->
+                    </div>
                 </div>
             </div>
         </div>
@@ -833,22 +911,70 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(8px);
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(5px);
     }
 
     :global(.export-modal-container) {
         width: 95vw;
-        height: 90vh;
+        height: 95vh;
         display: flex;
-        border-radius: 20px;
+        border-radius: 16px;
         overflow: hidden;
-        background: linear-gradient(145deg, #12121a 0%, #1a1a28 100%);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 
-            0 25px 80px rgba(0, 0, 0, 0.6),
-            0 0 0 1px rgba(255, 255, 255, 0.05),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        background: #18181b; /* zinc-950 */
+        border: 1px solid #27272a;
+        box-shadow: 0 0 50px rgba(0,0,0,0.5);
+    }
+
+    @media (max-width: 768px) {
+        :global(.export-modal-container) {
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            border-radius: 0;
+            border: none;
+        }
+    }
+
+    /* ========================================
+       MOBILE NAVIGATION (New)
+       ======================================== */
+    
+    .mobile-nav {
+        display: none; /* Hidden on desktop */
+        background: #09090b;
+        border-bottom: 1px solid #27272a;
+        padding: 0.5rem;
+        gap: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    @media (max-width: 768px) {
+        .mobile-nav {
+            display: flex;
+        }
+    }
+
+    .mobile-nav-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem;
+        border-radius: 8px;
+        background: transparent;
+        color: #71717a;
+        border: 2px solid transparent;
+        font-weight: 600;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .mobile-nav-btn.active {
+        color: white;
+        background: #27272a;
+        border-color: #3f3f46;
     }
 
     /* ========================================
@@ -860,16 +986,34 @@
         min-width: 380px;
         display: flex;
         flex-direction: column;
-        background: linear-gradient(180deg, rgba(139, 92, 246, 0.03) 0%, transparent 30%);
-        border-right: 1px solid rgba(255, 255, 255, 0.06);
+        background: #18181b;
+        border-right: 1px solid #27272a;
+        z-index: 20;
+    }
+    
+    @media (max-width: 768px) {
+        :global(.export-sidebar) {
+            width: 100%;
+            min-width: unset;
+            flex: 1; /* Use flex instead of fixed height */
+            height: auto;
+            min-height: 0; /* Crucial for scrolling inside flex container */
+            border-right: none;
+            overflow: hidden; /* Ensure only content scrolls */
+        }
+        
+        :global(.export-sidebar.hidden-mobile) {
+            display: none;
+        }
     }
 
     :global(.export-sidebar-header) {
         padding: 1.5rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        border-bottom: 1px solid #27272a;
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
+        gap: 1rem;
+        background: #18181b;
     }
 
     :global(.export-title-row) {
@@ -879,44 +1023,37 @@
     }
 
     :global(.export-title-icon) {
-        width: 48px;
-        height: 48px;
+        width: 42px;
+        height: 42px;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 14px;
+        background: #27272a;
+        border-radius: 10px;
         color: white;
-        box-shadow: 
-            0 8px 20px rgba(102, 126, 234, 0.35),
-            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        border: 1px solid #3f3f46;
     }
 
     :global(.export-title-text h2) {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
         font-weight: 700;
-        color: #ffffff;
+        color: #f4f4f5;
         margin: 0;
-        letter-spacing: -0.02em;
     }
 
     :global(.export-title-text p) {
         font-size: 0.8rem;
-        color: rgba(255, 255, 255, 0.4);
-        margin: 0.15rem 0 0 0;
+        color: #71717a;
+        margin: 0;
     }
 
-    /* ========================================
-       TABS
-       ======================================== */
-    
+    /* Tabs */
     :global(.export-tabs) {
         display: flex;
-        gap: 0.5rem;
-        background: rgba(255, 255, 255, 0.03);
-        padding: 0.375rem;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: #09090b;
+        padding: 0.25rem;
+        border-radius: 8px;
+        border: 1px solid #27272a;
     }
 
     :global(.export-tab) {
@@ -924,128 +1061,189 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.5rem;
-        padding: 0.625rem 1rem;
-        border-radius: 9px;
+        gap: 0.4rem;
+        padding: 0.5rem;
+        border-radius: 6px;
         font-size: 0.8rem;
         font-weight: 500;
-        color: rgba(255, 255, 255, 0.5);
+        color: #71717a;
         background: transparent;
         border: none;
         cursor: pointer;
-        transition: all 0.2s ease;
     }
 
     :global(.export-tab:hover) {
-        color: rgba(255, 255, 255, 0.75);
-        background: rgba(255, 255, 255, 0.03);
+        color: #d4d4d8;
     }
 
     :global(.export-tab-active) {
         color: #ffffff !important;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.4) 0%, rgba(118, 75, 162, 0.4) 100%) !important;
-        box-shadow: 
-            0 4px 12px rgba(102, 126, 234, 0.25),
-            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        background: #27272a !important;
+        font-weight: 600;
     }
 
-    /* ========================================
-       SIDEBAR CONTENT
-       ======================================== */
-    
+    /* Sidebar Content */
     :global(.export-sidebar-content) {
         flex-grow: 1;
         overflow-y: auto;
         padding: 1.25rem;
         display: flex;
         flex-direction: column;
-        gap: 1.5rem;
+        gap: 1.25rem;
     }
 
-    :global(.export-sidebar-content::-webkit-scrollbar) {
-        width: 6px;
+    /* Settings Components */
+    .setting-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    :global(.export-sidebar-content::-webkit-scrollbar-track) {
-        background: transparent;
+    .setting-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #d4d4d8;
+        background: #27272a; /* Label accent */
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        align-self: flex-start;
     }
 
-    :global(.export-sidebar-content::-webkit-scrollbar-thumb) {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
+    .setting-card {
+        background: #09090b;
+        border: 1px solid #27272a;
+        border-radius: 10px;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
     }
 
-    :global(.export-sidebar-content::-webkit-scrollbar-thumb:hover) {
-        background: rgba(255, 255, 255, 0.2);
+    .setting-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
-    /* ========================================
-       SIDEBAR FOOTER
-       ======================================== */
-    
+    .label {
+        font-size: 0.8rem;
+        color: #a1a1aa;
+    }
+
+    .divider {
+        height: 1px;
+        background: #27272a;
+        width: 100%;
+    }
+
+    /* Custom Inputs/Buttons Styles */
+    .scale-slider {
+        width: 5rem;
+        height: 4px;
+        border-radius: 4px;
+        background: #3f3f46;
+        accent-color: #6366f1;
+    }
+
+    .scale-value {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: white;
+        min-width: 2rem;
+        text-align: right;
+    }
+
+    .fancy-input {
+        width: 100%;
+        background: #18181b;
+        border: 1px solid #3f3f46;
+        color: white;
+        padding: 0.4rem 0.6rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        transition: border-color 0.2s;
+    }
+
+    .fancy-input:focus {
+        border-color: #6366f1;
+        outline: none;
+    }
+
+    .style-btn {
+        padding: 0.6rem;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        background: #18181b;
+        border: 2px solid #27272a;
+        color: #a1a1aa;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-align: center;
+    }
+
+    .style-btn:hover {
+        border-color: #3f3f46;
+    }
+
+    .style-btn.selected {
+        border-color: #6366f1;
+        background: rgba(99, 102, 241, 0.1);
+        color: #818cf8;
+        font-weight: 600;
+    }
+
+    /* Sidebar Footer */
     :global(.export-sidebar-footer) {
-        padding: 1.25rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 1rem;
+        border-top: 1px solid #27272a;
         display: flex;
         gap: 0.75rem;
-        background: rgba(0, 0, 0, 0.2);
+        background: #18181b;
     }
 
-    :global(.export-btn) {
+    .export-btn-cancel {
+        flex: 1;
+        background: transparent;
+        border: 1px solid #3f3f46;
+        color: #a1a1aa;
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+    }
+    
+    .export-btn-cancel:hover {
+        background: #27272a;
+        color: white;
+    }
+
+    .export-btn-action {
+        flex: 2;
+        background: #ffffff;
+        color: #000000;
+        border: none;
+        padding: 0.75rem;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.25rem;
-        border-radius: 10px;
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border: none;
     }
 
-    :global(.export-btn-secondary) {
-        flex: 1;
-        background: rgba(255, 255, 255, 0.05);
-        color: rgba(255, 255, 255, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+    .export-btn-action:hover {
+        background: #e4e4e7;
     }
-
-    :global(.export-btn-secondary:hover) {
-        background: rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-    }
-
-    :global(.export-btn-primary) {
-        flex: 2;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: #ffffff;
-        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
-    }
-
-    :global(.export-btn-primary:hover) {
-        box-shadow: 0 6px 28px rgba(102, 126, 234, 0.55);
-        transform: translateY(-1px);
-    }
-
-    :global(.export-btn-primary:disabled) {
-        opacity: 0.6;
+    
+    .export-btn-action:disabled {
+        opacity: 0.5;
         cursor: not-allowed;
-        transform: none;
-    }
-
-    :global(.export-btn-loading) {
-        width: 14px;
-        height: 14px;
-        border: 2px solid rgba(255, 255, 255, 0.3);
-        border-top-color: #ffffff;
-        border-radius: 50%;
-        animation: btn-spin 0.8s linear infinite;
-    }
-
-    @keyframes btn-spin {
-        to { transform: rotate(360deg); }
     }
 
     /* ========================================
@@ -1054,301 +1252,195 @@
     
     :global(.export-preview-area) {
         flex-grow: 1;
-        overflow: auto;
+        background: #0c0c0e; /* Even darker */
         position: relative;
+        overflow: hidden; /* Scroller handles scroll */
         display: flex;
         flex-direction: column;
-        cursor: default;
-        background: 
-            radial-gradient(ellipse at 20% 0%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
-            radial-gradient(ellipse at 80% 100%, rgba(59, 130, 246, 0.06) 0%, transparent 50%),
-            #0c0c12;
     }
 
-    :global(#export-preview button) {
-        display: none !important;
+    @media (max-width: 768px) {
+        :global(.export-preview-area.hidden-mobile) {
+            display: none;
+        }
     }
-    
-    /* Inspector Styles */
+
+    .preview-scroller {
+        flex: 1;
+        overflow: auto;
+        padding: 1rem;
+        display: flex;
+        align-items: flex-start;
+    }
+
+    /* Media query removed as we use 1rem globally now */
+
+    .inspector-badge, .preview-badge {
+        position: absolute;
+        z-index: 50;
+        pointer-events: none;
+    }
+
+    .inspector-badge {
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ef4444;
+        color: white;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.8rem;
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    }
+
+    .preview-badge {
+        top: 1rem;
+        right: 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    /* Inspector Overlay Highlights */
     :global(.inspector-highlight) {
-        outline: 2px solid #ef4444 !important;
-        outline-offset: -2px;
-        background-color: rgba(239, 68, 68, 0.1) !important;
+        outline: 2px dashed #ef4444 !important;
+        background: rgba(239, 68, 68, 0.2) !important;
         cursor: pointer !important;
     }
 
-    /* Manually hidden or Auto-hidden classes */
-    :global(.inspector-hidden-target),
     :global(.auto-hidden-target) {
-        opacity: 0.15 !important;
-        filter: grayscale(100%) opacity(30%) !important;
-        position: relative;
-    }
-    
-    :global(.inspector-hidden-target::after),
-    :global(.auto-hidden-target::after) {
-        content: "HIDDEN";
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: rgba(0,0,0,0.8);
-        color: white;
-        font-size: 9px;
-        padding: 1px 4px;
-        border-radius: 3px;
-        pointer-events: none;
-        z-index: 10;
-        white-space: nowrap;
+        opacity: 0.3 !important;
+        filter: grayscale(1) !important;
     }
 
     /* ========================================
-       MODERN DESIGN STYLES
+       EXPORT STYLES
        ======================================== */
-    
-    /* Modern Container */
-    :global(.export-modern) {
-        background: linear-gradient(135deg, #0f0f1a 0%, #1a1b2e 50%, #0d0d15 100%);
-        border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        box-shadow: 
-            0 25px 50px -12px rgba(0, 0, 0, 0.5),
-            0 0 100px rgba(139, 92, 246, 0.1);
+
+    /* The actual exported part */
+    :global(#export-preview) {
+        /* No fixed width here, width is controlled via style attr */
     }
 
-    /* Classic Container */
-    :global(.export-classic) {
-        background: var(--bgcolor, #1a1b1e);
-        border-radius: 8px;
-        padding: 2rem;
-        gap: 1rem;
-    }
-
-    /* Content wrapper for zoom scaling */
-    :global(.export-content-wrapper) {
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* ========================================
-       HEADER STYLES
-       ======================================== */
-    
     :global(.export-header) {
-        padding: 1.5rem 2rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 2rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
+
     :global(.export-header-content) {
         display: flex;
         align-items: center;
-        gap: 1rem;
+        gap: 1.5rem;
     }
-    
+
     :global(.export-header-avatar) {
-        width: 56px;
-        height: 56px;
-        min-width: 56px;
-        border-radius: 16px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: #27272a;
         background-size: cover;
-        background-position: center;
-        box-shadow: 
-            0 8px 16px rgba(102, 126, 234, 0.3),
-            inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+        background-position: center; 
     }
-    
-    :global(.export-header-info) {
-        display: flex;
-        flex-direction: column;
-        gap: 0.25rem;
-    }
-    
+
     :global(.export-header-name) {
-        font-size: 1.25em;
+        font-size: 2em;
         font-weight: 700;
-        color: #ffffff;
+        color: white;
         margin: 0;
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
     
     :global(.export-header-meta) {
-        font-size: 0.85em;
-        color: rgba(255, 255, 255, 0.5);
-        margin: 0;
-    }
-    
-    :global(.export-header-count) {
-        color: rgba(139, 92, 246, 0.8);
-        margin-left: 0.5rem;
+        font-size: 1em;
+        color: rgba(255, 255, 255, 0.6);
+        margin: 0.25em 0 0 0;
     }
 
-    /* ========================================
-       MESSAGES CONTAINER
-       ======================================== */
-    
     :global(.export-messages) {
-        padding: 1.5rem;
+        padding: 2rem;
         display: flex;
         flex-direction: column;
-        gap: 1.25rem;
+        gap: 1.5rem;
     }
 
-    :global(.export-classic .export-messages) {
-        padding: 0;
-        gap: 1rem;
-    }
-
-    /* Force font-size inheritance for all text elements inside export-messages */
-    :global(.export-messages *) {
-        font-size: inherit !important;
-    }
-    
-    :global(.export-messages p),
-    :global(.export-messages span),
-    :global(.export-messages div),
-    :global(.export-messages em),
-    :global(.export-messages strong),
-    :global(.export-messages i),
-    :global(.export-messages b) {
-        font-size: inherit !important;
-    }
-
-    /* ========================================
-       MESSAGE BUBBLE STYLES (Modern)
-       ======================================== */
-    
-    :global(.export-bubble-wrapper) {
-        display: flex;
-        align-items: flex-start;
-        gap: 0.75rem;
-    }
-    
-    :global(.export-bubble-right) {
-        flex-direction: row-reverse;
-    }
-    
-    :global(.export-avatar) {
-        width: 44px;
-        height: 44px;
-        min-width: 44px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        background-size: cover;
-        background-position: center;
-        box-shadow: 
-            0 4px 12px rgba(0, 0, 0, 0.3),
-            inset 0 0 0 2px rgba(255, 255, 255, 0.1);
-    }
-    
-    :global(.export-avatar-user) {
-        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    }
-    
-    :global(.export-avatar-placeholder) {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.25rem;
-    }
-    
-    :global(.export-bubble) {
-        max-width: 80%;
-        padding: 1rem 1.25rem;
-        border-radius: 18px;
-        position: relative;
-    }
-    
-    :global(.export-bubble-char) {
-        background: rgba(255, 255, 255, 0.05);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-top-left-radius: 4px;
-        box-shadow: 
-            0 8px 32px rgba(0, 0, 0, 0.2),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    }
-    
-    :global(.export-bubble-user-style) {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(29, 78, 216, 0.4) 100%);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-top-right-radius: 4px;
-        box-shadow: 
-            0 8px 32px rgba(59, 130, 246, 0.15),
-            inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    }
-    
-    :global(.export-bubble-name) {
-        font-size: 0.8em;
-        font-weight: 600;
-        color: rgba(255, 255, 255, 0.6);
-        margin-bottom: 0.5rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-    
-    :global(.export-bubble-char .export-bubble-name) {
-        color: rgba(139, 92, 246, 0.9);
-    }
-    
-    :global(.export-bubble-user-style .export-bubble-name) {
-        color: rgba(147, 197, 253, 0.9);
-    }
-    
-    :global(.export-bubble-content) {
-        color: rgba(255, 255, 255, 0.9);
-        line-height: 1.6;
-    }
-    
-    :global(.export-bubble-content p) {
-        margin: 0 0 0.75em 0;
-    }
-    
-    :global(.export-bubble-content p:last-child) {
-        margin-bottom: 0;
-    }
-
-    :global(.export-bubble-content em) {
-        color: rgba(196, 181, 253, 0.9);
-        font-style: italic;
-    }
-
-    :global(.export-bubble-content strong) {
-        color: #ffffff;
-        font-weight: 600;
-    }
-
-    /* ========================================
-       FOOTER STYLES
-       ======================================== */
-    
+    /* Footer */
     :global(.export-footer) {
-        padding: 1.25rem 2rem;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
         display: flex;
         justify-content: space-between;
-        align-items: center;
-        background: linear-gradient(180deg, transparent 0%, rgba(139, 92, 246, 0.05) 100%);
-    }
-    
-    :global(.export-footer-text) {
-        font-size: 0.85em;
         color: rgba(255, 255, 255, 0.4);
-        font-weight: 500;
     }
     
-    :global(.export-footer-date) {
-        font-size: 0.75em;
-        color: rgba(255, 255, 255, 0.3);
-        font-family: monospace;
+    /* === MODERN THEME === */
+    :global(.export-modern) {
+        background: #1e1e24; /* Nice gray-blue dark */
+        color: #f4f4f5;
+        font-family: 'Inter', sans-serif;
     }
 
-    /* Classic mode footer */
-    :global(.export-classic .export-footer) {
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 8px;
-        margin-top: 1rem;
-        padding: 1rem;
+    :global(.export-modern .export-bubble-wrapper) {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
     }
+
+    :global(.export-modern .export-bubble-right) {
+        flex-direction: row-reverse;
+    }
+
+    :global(.export-modern .export-avatar) {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background-color: #3f3f46;
+        background-size: cover;
+        background-position: center;
+        flex-shrink: 0;
+    }
+
+    :global(.export-modern .export-bubble) {
+        background: #27272a;
+        padding: 1rem 1.25rem;
+        border-radius: 16px;
+        border-top-left-radius: 0;
+        max-width: 85%;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    :global(.export-modern .export-bubble-user-style) {
+        background: #3b82f6; /* Blue 500 */
+        color: white;
+        border-top-left-radius: 16px;
+        border-top-right-radius: 0;
+    }
+    
+    :global(.export-modern .export-bubble-name) {
+        font-size: 0.75em;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0.5rem;
+        opacity: 0.7;
+        font-weight: 700;
+    }
+
+    :global(.export-modern .export-bubble-content) {
+        line-height: 1.6;
+    }
+
+    /* === CLASSIC THEME === */
+    :global(.export-classic) {
+        background: #1a1b1e;
+        color: #c1c2c5;
+        font-family: sans-serif;
+    }
+    
+    :global(.export-classic .export-messages) {
+        padding: 0 2rem;
+        gap: 0;
+    }
+
 </style>

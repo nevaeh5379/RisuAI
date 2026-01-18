@@ -1544,4 +1544,5 @@ export const languageEnglish = {
     rerankerTopK: "Reranker Top K",
     lorebookPlusMaxTokens: "Max Tokens (Embedding)",
     rerankerMaxTokens: "Max Tokens (Reranker)",
+    focusMode: "Focus Mode",
 }

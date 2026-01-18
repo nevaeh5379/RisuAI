@@ -272,6 +272,9 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.askRemoval)) {
         data.askRemoval = true
     }
+    if (checkNullish(data.focusMode)) {
+        data.focusMode = false
+    }
     if (checkNullish(data.sdConfig)) {
         data.sdConfig = {
             width: 512,
@@ -810,6 +813,7 @@ export interface Database {
     globalNote: string
     temperature: number
     askRemoval: boolean
+    focusMode: boolean
     maxContext: number
     maxResponse: number
     frequencyPenalty: number
