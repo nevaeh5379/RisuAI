@@ -5,7 +5,10 @@
 	import { DBState } from 'src/ts/stores.svelte';
     import { selectedCharID } from "../../ts/stores.svelte";
     import { translate } from "src/ts/translator/translator";
-    import { CopyIcon, LanguagesIcon, RefreshCcwIcon } from "@lucide/svelte";
+    import { CopyIcon, LanguagesIcon, RefreshCcwIcon, XIcon } from "@lucide/svelte";
+    import { loadLoreBookV3Prompt } from "../../ts/process/lorebook.svelte";
+    import { risuChatParser } from "../../ts/process/scripts";
+    import { getAuthorNoteDefaultText, getPersonaPrompt } from "../../ts/util";
     import { alertConfirm } from "src/ts/alert";
     import { language } from "src/lang";
     import { getUserName, replacePlaceholders } from "../../ts/util";
@@ -55,29 +58,65 @@
             if(lastMessages.length === 0)
                 return
             const prompt = DBState.db.autoSuggestPrompt && DBState.db.autoSuggestPrompt.length > 0 ? DBState.db.autoSuggestPrompt : defaultAutoSuggestPrompt
+            
+            // Context Building
+            let context = ""
+            
+            // 1. Description, Personality, Scenario
+            context += risuChatParser(currentChar.desc, {chara: currentChar})
+            if(currentChar.personality){
+                context += "\n\n" + risuChatParser(currentChar.personality, {chara: currentChar})
+            }
+            if(currentChar.scenario){
+                context += "\n\n" + risuChatParser(currentChar.scenario, {chara: currentChar})
+            }
+
+            // 2. Persona
+            const personaPrompt = getPersonaPrompt()
+            if(personaPrompt){
+                context += "\n\n" + risuChatParser(personaPrompt, {chara: currentChar})
+            }
+
+            // 3. Lorebook
+            const lorepmt = await loadLoreBookV3Prompt()
+            for(const lore of lorepmt.actives){
+                context += "\n\n" + risuChatParser(lore.prompt, {chara: currentChar})
+            }
+
+            // 4. Author's Note
+            const authorNote = currentChar.chats[currentChar.chatPage].note || getAuthorNoteDefaultText()
+            if(authorNote){
+                context += "\n\n" + risuChatParser(authorNote, {chara: currentChar})
+            }
+
             let promptbody:OpenAIChat[] = [
+            {
+                role:'system',
+                content: context
+            },
             {
                 role:'system',
                 content: replacePlaceholders(prompt, currentChar.name)
             }
-            ,{
-                role: 'user', 
-                content: lastMessages.map(b=>(b.role==='char'? currentChar.name : getUserName())+":"+b.data).reduce((a,b)=>a+','+b)
-            }
+            // ,{
+            //     role: 'user', 
+            //     content: lastMessages.map(b=>(b.role==='char'? currentChar.name : getUserName())+":"+b.data).reduce((a,b)=>a+','+b)
+            // }
             ]
 
-            if(DBState.db.subModel === "textgen_webui" || DBState.db.subModel === 'mancer' || DBState.db.subModel.startsWith('local_')){
-                promptbody = [
-                    {
-                        role: 'system',
-                        content: replacePlaceholders(DBState.db.autoSuggestPrompt, currentChar.name)
-                    },
-                    ...lastMessages.map(({ role, data }) => ({
-                        role: role === "user" ? "user" as const : "assistant" as const,
-                        content: data,
-                    })),
-                ]
-            }
+            lastMessages.map (b=> {
+                if(b.role === 'user') {
+                    promptbody.push({
+                        role: 'user',
+                        content: b.data
+                    })
+                } else {
+                    promptbody.push({
+                        role: 'assistant',
+                        content: b.data
+                    })
+                }
+            })
 
             progress = true
             progressChatPage = chatPage
@@ -134,16 +173,28 @@
         >
             <div class="text-xs text-textcolor2 mb-2 flex items-center justify-between">
                 <span>{language.autoSuggest}</span>
-                <button 
-                    class="hover:text-textcolor transition-colors"
-                    onclick={() => {
-                        suggestMessages = []
-                        doingChat.set(true)
-                        doingChat.set(false)
-                    }}
-                >
-                    <RefreshCcwIcon size={12}/>
-                </button>
+                <div class="flex items-center gap-2">
+                    <button 
+                        class="hover:text-textcolor transition-colors"
+                        title={language.reroll}
+                        onclick={() => {
+                            suggestMessages = []
+                            doingChat.set(true)
+                            doingChat.set(false)
+                        }}
+                    >
+                        <RefreshCcwIcon size={12}/>
+                    </button>
+                    <button 
+                        class="hover:text-textcolor transition-colors"
+                        title={language.close}
+                        onclick={() => {
+                            suggestMessages = []
+                        }}
+                    >
+                        <XIcon size={12}/>
+                    </button>
+                </div>
             </div>
             <ul class="space-y-1">
                 {#each (suggestMessages??[]).slice(0, 4) as suggest, i}
