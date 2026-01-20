@@ -88,6 +88,11 @@
     let contextMenuOpen = $state(false);
     let contextMenuX = $state(0);
     let contextMenuY = $state(0);
+    
+    // Inline editing state
+    let inlineEditTarget: HTMLElement | null = $state(null);
+    let inlineEditOriginalText = $state("");
+    let inlineEditOriginalHtml = $state("");
     interface Props {
         message?: string;
         name?: string;
@@ -186,8 +191,25 @@
     }
 
     // Context menu handlers
-    function openContextMenu(e: MouseEvent | TouchEvent) {
+    function openContextMenu(e: MouseEvent | TouchEvent, fromLongpress = false) {
         if (idx < 0) return;
+        
+        // For longpress (touch) events, check if the target is within text content area
+        // If so, skip context menu to allow native text selection/copy
+        if (fromLongpress && e.target instanceof HTMLElement) {
+            const target = e.target;
+            // Check if target or its ancestors are text content elements where selection should be allowed
+            const isTextContent = target.closest('.prose, .message-edit-area, p, span, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, code, pre, em, strong, u, del, a');
+            // Also check if target itself is a text node container or has selectable text
+            const isSelectableText = target.matches('p, span, h1, h2, h3, h4, h5, h6, li, td, th, blockquote, code, pre, em, strong, u, del, a') || 
+                                     target.closest('.prose') !== null;
+            
+            if (isTextContent || isSelectableText) {
+                // Don't open context menu, let browser handle text selection
+                return;
+            }
+        }
+        
         e.preventDefault();
         
         if ('touches' in e) {
@@ -248,6 +270,139 @@
         DBState.db.characters[selIdState.selId].chats[
             DBState.db.characters[selIdState.selId].chatPage
         ].message[idx].disabled = currentMessage.disabled === "allBefore" ? false : "allBefore";
+    }
+
+    // Inline editing functions
+    function handleDoubleClick(e: MouseEvent) {
+        if (idx < 0 || editMode) return;
+        
+        const target = e.target as HTMLElement;
+        if (!target) return;
+        
+        // Find the closest editable text element
+        const editableElement = target as HTMLElement;
+        if (!editableElement || !bodyRoot?.contains(editableElement)) return;
+        
+        // Don't edit if already editing something else
+        if (inlineEditTarget) {
+            finishInlineEdit();
+        }
+        
+        // Store original content
+        inlineEditTarget = editableElement;
+        inlineEditOriginalText = editableElement.textContent || "";
+        inlineEditOriginalHtml = editableElement.innerHTML;
+        
+        // Make element editable
+        editableElement.contentEditable = "true";
+        editableElement.style.outline = "2px solid #3b82f6";
+        editableElement.style.outlineOffset = "2px";
+        editableElement.style.borderRadius = "4px";
+        editableElement.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+        editableElement.focus();
+        
+        // Select all text in the element
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editableElement);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        
+        // Add event listeners
+        editableElement.addEventListener('blur', handleInlineEditBlur);
+        editableElement.addEventListener('keydown', handleInlineEditKeydown);
+    }
+    
+    function handleInlineEditKeydown(e: KeyboardEvent) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            finishInlineEdit();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelInlineEdit();
+        }
+    }
+    
+    function handleInlineEditBlur() {
+        // Small delay to allow click events to be processed first
+        setTimeout(() => {
+            if (inlineEditTarget) {
+                finishInlineEdit();
+            }
+        }, 100);
+    }
+    
+    function finishInlineEdit() {
+        if (!inlineEditTarget) return;
+        
+        const newText = inlineEditTarget.textContent || "";
+        const element = inlineEditTarget;
+        
+        // Remove editable state
+        element.contentEditable = "false";
+        element.style.outline = "";
+        element.style.outlineOffset = "";
+        element.style.borderRadius = "";
+        element.style.backgroundColor = "";
+        element.removeEventListener('blur', handleInlineEditBlur);
+        element.removeEventListener('keydown', handleInlineEditKeydown);
+        
+        // If text changed, update the message
+        if (newText !== inlineEditOriginalText) {
+            // Find and replace in original message
+            const originalText = inlineEditOriginalText.trim();
+            const newTextTrimmed = newText.trim();
+            
+            if (originalText && message.includes(originalText)) {
+                message = message.replace(originalText, newTextTrimmed);
+                // Save to database
+                DBState.db.characters[selIdState.selId].chats[
+                    DBState.db.characters[selIdState.selId].chatPage
+                ].message[idx].data = message;
+            } else {
+                // If exact match not found, try to find similar text
+                // This handles cases where markdown formatting differs from rendered text
+                const lines = message.split('\n');
+                let found = false;
+                for (let i = 0; i < lines.length; i++) {
+                    // Remove markdown formatting for comparison
+                    const cleanLine = lines[i].replace(/[*_~`#>\-\[\]()]/g, '').trim();
+                    if (cleanLine === originalText || lines[i].includes(originalText)) {
+                        lines[i] = lines[i].replace(originalText, newTextTrimmed);
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    message = lines.join('\n');
+                    DBState.db.characters[selIdState.selId].chats[
+                        DBState.db.characters[selIdState.selId].chatPage
+                    ].message[idx].data = message;
+                }
+            }
+        }
+        
+        inlineEditTarget = null;
+        inlineEditOriginalText = "";
+        inlineEditOriginalHtml = "";
+    }
+    
+    function cancelInlineEdit() {
+        if (!inlineEditTarget) return;
+        
+        // Restore original content
+        inlineEditTarget.innerHTML = inlineEditOriginalHtml;
+        inlineEditTarget.contentEditable = "false";
+        inlineEditTarget.style.outline = "";
+        inlineEditTarget.style.outlineOffset = "";
+        inlineEditTarget.style.borderRadius = "";
+        inlineEditTarget.style.backgroundColor = "";
+        inlineEditTarget.removeEventListener('blur', handleInlineEditBlur);
+        inlineEditTarget.removeEventListener('keydown', handleInlineEditKeydown);
+        
+        inlineEditTarget = null;
+        inlineEditOriginalText = "";
+        inlineEditOriginalHtml = "";
     }
 
     // Handle click when range selection mode is active
@@ -591,6 +746,7 @@
                     editMode = true;
                 }
             }}
+            ondblclick={handleDoubleClick}
             style:font-size="{0.875 * (DBState.db.zoomsize / 100)}rem"
             style:line-height="{(DBState.db.lineHeight ?? 1.25) *
                 (DBState.db.zoomsize / 100)}rem"
@@ -1580,7 +1736,7 @@
         }
     }}
     oncontextmenu={openContextMenu}
-    use:longpress={openContextMenu}
+    use:longpress={(e) => openContextMenu(e, true)}
 >
     <div
         class="text-textcolor mt-1 ml-4 mr-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full"
