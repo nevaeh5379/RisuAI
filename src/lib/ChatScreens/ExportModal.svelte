@@ -28,6 +28,8 @@
 
     type Tab = 'settings' | 'filters';
 
+    type Theme = 'modern' | 'classic' | 'neon' | 'paper' | 'console' | 'fluent' | 'cupertino';
+
     // --- State ---
     let exportContainer = $state<HTMLElement>();
     let loading = $state(false);
@@ -52,7 +54,7 @@
     let showHeader = $state(true);
     let showFooter = $state(true);
     let footerText = $state("Exported from RisuAI");
-    let useModernDesign = $state(true);
+    let selectedTheme = $state<Theme>('modern');
     
     // Filter Options
     let stripHtml = $state(false);
@@ -349,6 +351,12 @@
                     node.classList.contains('auto-hidden-target')) {
                     return false;
                 }
+                // Skip images that failed to load
+                if (node instanceof HTMLImageElement) {
+                    if (!node.complete || node.naturalWidth === 0) {
+                        return false;
+                    }
+                }
             }
             return true;
         };
@@ -358,6 +366,9 @@
             const height = exportContainer.scrollHeight;
             const CHUNK_SIZE = 8000;
             let finalBytes: Uint8Array;
+            
+            // Transparent 1x1 PNG placeholder for failed images
+            const transparentPlaceholder = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
             if (height <= CHUNK_SIZE) {
                 loadingMessage = 'Capturing...';
@@ -366,7 +377,10 @@
                     backgroundColor: '#1a1b1e', 
                     style: { transform: 'scale(1)' },
                     filter,
-                    cacheBust: false
+                    cacheBust: false,
+                    skipAutoScale: true,
+                    skipFonts: true,
+                    imagePlaceholder: transparentPlaceholder
                 });
                 if (!blob) throw new Error("Image capture failed");
                 finalBytes = new Uint8Array(await blob.arrayBuffer());
@@ -391,7 +405,10 @@
                             height: `${height}px`,
                         },
                         filter,
-                        cacheBust: false
+                        cacheBust: false,
+                        skipAutoScale: true,
+                        skipFonts: true,
+                        imagePlaceholder: transparentPlaceholder
                     });
                     
                     if (!blob) throw new Error("Chunk capture failed");
@@ -648,20 +665,55 @@
 
                             <div class="flex flex-col gap-2">
                                 <span class="label">Design Style 🎭</span>
-                                <div class="grid grid-cols-2 gap-2">
-                                    <button 
+                                <div class="grid grid-cols-3 gap-2">
+                                     <button 
                                         class="style-btn"
-                                        class:selected={!useModernDesign}
-                                        onclick={() => useModernDesign = false}
+                                        class:selected={selectedTheme === 'modern'}
+                                        onclick={() => selectedTheme = 'modern'}
                                     >
-                                        Classic 📜
+                                        Modern 💎
+                                    </button>
+                                     <button 
+                                        class="style-btn"
+                                        class:selected={selectedTheme === 'fluent'}
+                                        onclick={() => selectedTheme = 'fluent'}
+                                    >
+                                        Fluent 🪟
                                     </button>
                                     <button 
                                         class="style-btn"
-                                        class:selected={useModernDesign}
-                                        onclick={() => useModernDesign = true}
+                                        class:selected={selectedTheme === 'cupertino'}
+                                        onclick={() => selectedTheme = 'cupertino'}
                                     >
-                                        Modern 💎
+                                        MacOS 🍎
+                                    </button>
+                                    <button 
+                                        class="style-btn"
+                                        class:selected={selectedTheme === 'neon'}
+                                        onclick={() => selectedTheme = 'neon'}
+                                    >
+                                        Neon 🌃
+                                    </button>
+                                    <button 
+                                        class="style-btn"
+                                        class:selected={selectedTheme === 'paper'}
+                                        onclick={() => selectedTheme = 'paper'}
+                                    >
+                                        Paper 📜
+                                    </button>
+                                    <button 
+                                        class="style-btn"
+                                        class:selected={selectedTheme === 'console'}
+                                        onclick={() => selectedTheme = 'console'}
+                                    >
+                                        Console 📟
+                                    </button>
+                                    <button 
+                                        class="style-btn"
+                                        class:selected={selectedTheme === 'classic'}
+                                        onclick={() => selectedTheme = 'classic'}
+                                    >
+                                        Classic 👴
                                     </button>
                                 </div>
                             </div>
@@ -774,8 +826,13 @@
                         bind:this={exportContainer} 
                         bind:clientHeight={contentHeight}
                         class="flex flex-col shrink-0 transition-all duration-200 overflow-hidden"
-                        class:export-modern={useModernDesign}
-                        class:export-classic={!useModernDesign}
+                        class:export-modern={selectedTheme === 'modern'}
+                        class:export-classic={selectedTheme === 'classic'}
+                        class:export-neon={selectedTheme === 'neon'}
+                        class:export-paper={selectedTheme === 'paper'}
+                        class:export-console={selectedTheme === 'console'}
+                        class:export-fluent={selectedTheme === 'fluent'}
+                        class:export-cupertino={selectedTheme === 'cupertino'}
                         style="width: {exportWidth}px; transform: scale({fitScale}); transform-origin: top left;"
                         onmouseover={handleMouseOver}
                         onmouseout={handleMouseOut}
@@ -808,7 +865,7 @@
                         <div class="export-messages" style="font-size: {fontSize}px;">
                             {#each displayMessages as msg, i}
                                 <div class="export-message" class:export-message-user={msg.role === 'user'}>
-                                    {#if useModernDesign}
+                                    {#if selectedTheme !== 'classic'}
                                         <!-- Modern Design: Custom message bubble -->
                                         <div class="export-bubble-wrapper" class:export-bubble-right={msg.role === 'user'}>
                                             {#if msg.role !== 'user'}
@@ -823,7 +880,8 @@
                                             <!-- svelte-ignore a11y_click_events_have_key_events -->
                                             <!-- svelte-ignore a11y_no_static_element_interactions -->
                                             <div 
-                                                class="export-bubble-content chattext prose prose-invert max-w-none"
+                                                class="export-bubble-content chattext prose max-w-none"
+                                                class:prose-invert={(selectedTheme === 'cupertino' && msg.role === 'user') || ['modern', 'neon', 'console'].includes(selectedTheme)}
                                                 bind:this={messageElements[i]}
                                             >
                                                 <ChatBody 
@@ -1441,6 +1499,452 @@
     :global(.export-classic .export-messages) {
         padding: 0 2rem;
         gap: 0;
+    }
+
+    /* === NEON THEME (Subtle) === */
+    :global(.export-neon) {
+        background: #0f1014; /* Very Dark Blue-Black */
+        color: #e2e8f0;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    :global(.export-neon .export-header-name) {
+        color: #e0e0e0;
+        text-shadow: 0 0 10px rgba(139, 92, 246, 0.5); /* Subtle purple glow */
+    }
+
+    :global(.export-neon .export-bubble-wrapper) {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    :global(.export-neon .export-bubble-right) {
+        flex-direction: row-reverse;
+    }
+
+    :global(.export-neon .export-avatar) {
+        width: 50px;
+        height: 50px;
+        border-radius: 8px; /* Slightly sharper */
+        background-color: #1e1e24;
+        background-size: cover;
+        background-position: center;
+        flex-shrink: 0;
+        border: 1px solid rgba(139, 92, 246, 0.3);
+        box-shadow: 0 0 8px rgba(139, 92, 246, 0.1);
+    }
+
+    :global(.export-neon .export-bubble) {
+        background: #15151a;
+        padding: 1rem 1.25rem;
+        border-radius: 4px;
+        border: 1px solid #2d2d35;
+        max-width: 85%;
+        border-left: 2px solid #8b5cf6; /* Purple accent */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+
+    :global(.export-neon .export-bubble-user-style) {
+        background: #1a1a20;
+        border-left: 1px solid #2d2d35;
+        border-right: 2px solid #06b6d4; /* Cyan accent */
+        color: #e2e8f0;
+    }
+
+    :global(.export-neon .export-bubble-name) {
+        font-size: 0.75em;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.5rem;
+        color: #8b5cf6;
+        font-weight: 700;
+        text-shadow: 0 0 5px rgba(139, 92, 246, 0.3);
+    }
+
+    :global(.export-neon .export-bubble-user-style .export-bubble-name) {
+        color: #06b6d4;
+        text-shadow: 0 0 5px rgba(6, 182, 212, 0.3);
+        text-align: right;
+    }
+
+    /* === PAPER THEME (Novel Style) === */
+    :global(.export-paper) {
+        background: #fdfbf7; /* Cream white */
+        color: #000000;
+        font-family: 'Merriweather', 'Georgia', serif;
+    }
+
+    /* Force black text for light themes - Aggressive Override */
+    :global(.export-paper .prose),
+    :global(.export-fluent .prose),
+    :global(.export-cupertino .prose) {
+        --tw-prose-body: #000000;
+        --tw-prose-headings: #000000;
+        --tw-prose-lead: #000000;
+        --tw-prose-links: #000000;
+        --tw-prose-bold: #000000;
+        --tw-prose-counters: #000000;
+        --tw-prose-bullets: #000000;
+        --tw-prose-hr: #000000;
+        --tw-prose-quotes: #000000;
+        --tw-prose-quote-borders: #000000;
+        --tw-prose-captions: #000000;
+        --tw-prose-code: #000000;
+        --tw-prose-pre-code: #000000;
+        --tw-prose-pre-bg: #f5f5f5;
+        --tw-prose-th-borders: #000000;
+        --tw-prose-td-borders: #000000;
+        color: #000000 !important;
+    }
+
+    /* Override global chattext styles */
+    :global(.export-paper .chattext p),
+    :global(.export-paper .chattext span),
+    :global(.export-paper .chattext strong),
+    :global(.export-paper .chattext em),
+    :global(.export-fluent .chattext p),
+    :global(.export-fluent .chattext span),
+    :global(.export-fluent .chattext strong),
+    :global(.export-fluent .chattext em),
+    :global(.export-cupertino .chattext p),
+    :global(.export-cupertino .chattext span),
+    :global(.export-cupertino .chattext strong),
+    :global(.export-cupertino .chattext em) {
+        color: #000000 !important;
+    }
+
+    /* Exception for Cupertino User Bubble (Blue bg, White text) */
+    :global(.export-cupertino .export-bubble-user-style .prose) {
+        --tw-prose-body: #ffffff;
+        --tw-prose-headings: #ffffff;
+        /* ... */
+        color: #ffffff !important;
+    }
+    :global(.export-cupertino .export-bubble-user-style .chattext p),
+    :global(.export-cupertino .export-bubble-user-style .chattext span),
+    :global(.export-cupertino .export-bubble-user-style .chattext strong),
+    :global(.export-cupertino .export-bubble-user-style .chattext em) {
+        color: #ffffff !important;
+    }
+
+    :global(.export-paper .export-header-name) {
+        color: #000000;
+        font-family: 'Playfair Display', serif;
+        border-bottom: 2px solid #000;
+        padding-bottom: 0.5rem;
+        display: inline-block;
+    }
+
+    :global(.export-paper .export-header-meta) {
+        color: #444;
+        font-style: italic;
+    }
+
+    :global(.export-paper .export-footer) {
+        border-top: 2px solid #000;
+        color: #000;
+    }
+
+    :global(.export-paper .export-bubble-wrapper) {
+        display: block; /* No flex, standard block flow */
+        margin-bottom: 1.5rem;
+    }
+
+    :global(.export-paper .export-bubble-right) {
+        /* No row-reverse */
+    }
+
+    :global(.export-paper .export-avatar) {
+        display: none; /* No avatars in novel mode */
+    }
+
+    :global(.export-paper .export-bubble) {
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
+        max-width: 100%;
+        box-shadow: none;
+        border: none;
+        line-height: 1.8;
+    }
+
+    :global(.export-paper .export-bubble-user-style) {
+        background: transparent;
+        border: none;
+    }
+
+    :global(.export-paper .export-bubble-name) {
+        font-size: 1rem;
+        font-weight: 700;
+        color: #000;
+        margin-bottom: 0.25rem;
+        font-family: sans-serif;
+        display: block;
+    }
+    
+    /* Novel style formatting for name */
+    :global(.export-paper .export-bubble-name::after) {
+        content: ": ";
+    }
+
+    /* === CONSOLE THEME === */
+    :global(.export-console) {
+        background: #000000;
+        color: #00ff00; /* Bright Green */
+        font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* Force green console text over prose defaults */
+    :global(.export-console .prose) {
+        --tw-prose-body: #00ff00;
+        --tw-prose-headings: #00ff00;
+        --tw-prose-lead: #00ff00;
+        --tw-prose-links: #00ff00;
+        --tw-prose-bold: #00ff00;
+        --tw-prose-counters: #00ff00;
+        --tw-prose-bullets: #00ff00;
+        --tw-prose-hr: #00ff00;
+        --tw-prose-quotes: #00ff00;
+        --tw-prose-quote-borders: #00ff00;
+        --tw-prose-captions: #00ff00;
+        --tw-prose-code: #00ff00;
+        --tw-prose-pre-code: #00ff00;
+        --tw-prose-pre-bg: #000000;
+        --tw-prose-th-borders: #00ff00;
+        --tw-prose-td-borders: #00ff00;
+        color: #00ff00 !important;
+    }
+    :global(.export-console .prose *) {
+        color: #00ff00 !important;
+        border-color: #00ff00 !important;
+    }
+
+    :global(.export-console .export-header) {
+        border-bottom: 1px dashed #00ff00;
+    }
+
+    :global(.export-console .export-footer) {
+        border-top: 1px dashed #00ff00;
+        color: #00aa00;
+    }
+
+    :global(.export-console .export-header-name) {
+        color: #00ff00;
+        text-transform: uppercase;
+    }
+
+    :global(.export-console .export-header-meta) {
+        color: #00aa00;
+    }
+
+    :global(.export-console .export-bubble-wrapper) {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 0.5rem;
+    }
+
+    :global(.export-console .export-bubble-right) {
+        flex-direction: row-reverse;
+    }
+
+    :global(.export-console .export-avatar) {
+        display: none; /* No avatars in console */
+    }
+
+    :global(.export-console .export-bubble) {
+        background: transparent;
+        padding: 0;
+        max-width: 100%;
+        border-left: 2px solid #00ff00;
+        padding-left: 1rem;
+    }
+
+    :global(.export-console .export-bubble-user-style) {
+        border-left: none;
+        border-right: 2px solid #00ff00; /* User on right */
+        padding-left: 0;
+        padding-right: 1rem;
+        text-align: right;
+    }
+
+    :global(.export-console .export-bubble-name) {
+        font-size: 0.8em;
+        margin-bottom: 0.2rem;
+        opacity: 0.8;
+    }
+
+    :global(.export-console .export-bubble-name::before) {
+        content: '<';
+    }
+    :global(.export-console .export-bubble-name::after) {
+        content: '>';
+    }
+
+    /* === FLUENT THEME (Microsoft) === */
+    :global(.export-fluent) {
+        background: #f3f3f3; /* Windows Light Gray */
+        color: #000000;
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    :global(.export-fluent .export-header-name) {
+        color: #1a1a1a;
+        font-weight: 600;
+    }
+    
+    :global(.export-fluent .export-header-meta) {
+        color: #666;
+    }
+
+    :global(.export-fluent .export-footer) {
+        border-top: 1px solid #e5e5e5;
+        color: #666;
+    }
+
+    :global(.export-fluent .export-bubble-wrapper) {
+        display: flex;
+        gap: 0.75rem;
+        align-items: flex-end; /* Bottom align like Teams/Skype often do, or top? Standard is top */
+        align-items: flex-start;
+    }
+
+    :global(.export-fluent .export-bubble-right) {
+        flex-direction: row-reverse;
+    }
+
+    :global(.export-fluent .export-avatar) {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-color: #ddd;
+        background-size: cover;
+        background-position: center;
+        flex-shrink: 0;
+    }
+
+    :global(.export-fluent .export-bubble) {
+        background: #ffffff;
+        padding: 0.6rem 1rem;
+        border-radius: 8px; /* Fluent rounded corners */
+        max-width: 80%;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        border: 1px solid #e5e5e5;
+    }
+
+    :global(.export-fluent .export-bubble-user-style) {
+        background: #d1e7ff; /* Fluent Blue Light */
+        border: 1px solid #bae6ff;
+        color: #000;
+    }
+
+    :global(.export-fluent .export-bubble-name) {
+        font-size: 0.75em;
+        margin-bottom: 0.2rem;
+        color: #555;
+        font-weight: 600;
+    }
+
+    /* === CUPERTINO THEME (macOS) === */
+    :global(.export-cupertino) {
+        background: #ffffff;
+        color: #000000;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    }
+
+    :global(.export-cupertino .export-header) {
+        background: rgba(245, 245, 247, 0.8);
+        -webkit-backdrop-filter: blur(20px);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid #d1d1d6;
+    }
+
+    :global(.export-cupertino .export-header-name) {
+        color: #000;
+        font-weight: 600;
+    }
+
+    :global(.export-cupertino .export-header-meta) {
+        color: #8e8e93;
+    }
+
+    :global(.export-cupertino .export-footer) {
+        border-top: 1px solid #d1d1d6;
+        color: #8e8e93;
+        background: #f5f5f7;
+    }
+
+    :global(.export-cupertino .export-bubble-wrapper) {
+        display: flex;
+        gap: 0.5rem;
+        align-items: flex-end; /* iMessage style is bottom aligned */
+    }
+
+    :global(.export-cupertino .export-bubble-right) {
+        flex-direction: row-reverse;
+    }
+
+    :global(.export-cupertino .export-avatar) {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #e5e5ea;
+        background-size: cover;
+        background-position: center;
+        flex-shrink: 0;
+        margin-bottom: 2px;
+    }
+
+    :global(.export-cupertino .export-bubble) {
+        background: #e5e5ea; /* iMessage Gray */
+        padding: 0.5rem 1rem;
+        border-radius: 18px; /* High rounding */
+        max-width: 75%;
+        color: #000;
+        position: relative;
+    }
+
+    :global(.export-cupertino .export-bubble-user-style) {
+        background: #007aff; /* iMessage Blue */
+        color: white;
+    }
+
+    :global(.export-cupertino .export-bubble-name) {
+        display: none; /* Usually hidden in iMessage unless group chat, but we keep it simple or make it small above? */
+    }
+
+    /* Add back name for clarity but outside bubble */
+    :global(.export-cupertino .export-bubble-wrapper) {
+        position: relative;
+        padding-top: 15px; /* Space for name */
+    }
+    
+    :global(.export-cupertino .export-bubble-name) {
+        display: block;
+        position: absolute;
+        top: 0;
+        left: 3.5rem; /* avatar + gap */
+        font-size: 0.7rem;
+        color: #8e8e93;
+        font-weight: 500;
+    }
+
+    :global(.export-cupertino .export-bubble-right .export-bubble-name) {
+        left: auto;
+        right: 3.5rem;
+        text-align: right;
+    }
+
+    /* === FONT SIZE INHERITANCE === */
+    /* Force prose to inherit font-size from export-messages */
+    :global(.export-messages .prose) {
+        font-size: inherit !important;
+    }
+    :global(.export-messages .prose p),
+    :global(.export-messages .prose li),
+    :global(.export-messages .prose span) {
+        font-size: inherit !important;
     }
 
 </style>

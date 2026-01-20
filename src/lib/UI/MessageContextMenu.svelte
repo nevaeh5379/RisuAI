@@ -29,6 +29,7 @@
     } = $props();
 
     let menuRef = $state<HTMLDivElement>();
+    let openTimestamp = $state(0);
     
     // Calculate menu position to avoid overflow
     let adjustedX = $derived.by(() => {
@@ -100,21 +101,33 @@
         }
     }
 
-    function handleClickOutside(e: MouseEvent) {
-        if (menuRef && !menuRef.contains(e.target as Node)) {
+    function handleClickOutside(e: MouseEvent | TouchEvent) {
+        // Ignore events that happen within 150ms of opening (synthetic click from touch)
+        if (Date.now() - openTimestamp < 150) return;
+        
+        const target = e.target as Node;
+        if (menuRef && !menuRef.contains(target)) {
             close();
         }
     }
 
     $effect(() => {
         if (open) {
-            document.addEventListener('click', handleClickOutside);
+            openTimestamp = Date.now();
+            // Small delay to prevent immediate close from synthetic click
+            const timeoutId = setTimeout(() => {
+                document.addEventListener('click', handleClickOutside);
+                document.addEventListener('touchstart', handleClickOutside);
+            }, 50);
             document.addEventListener('keydown', handleKeydown);
+            
+            return () => {
+                clearTimeout(timeoutId);
+                document.removeEventListener('click', handleClickOutside);
+                document.removeEventListener('touchstart', handleClickOutside);
+                document.removeEventListener('keydown', handleKeydown);
+            };
         }
-        return () => {
-            document.removeEventListener('click', handleClickOutside);
-            document.removeEventListener('keydown', handleKeydown);
-        };
     });
 </script>
 
