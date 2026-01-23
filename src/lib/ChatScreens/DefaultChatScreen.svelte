@@ -19,6 +19,8 @@
         XIcon,
         BrainIcon,
         ArrowDown,
+        UserIcon,
+        ChevronDownIcon,
     } from "@lucide/svelte";
     import { triggerTypingEffect, playSendSound } from "../../ts/gui/typingEffect";
     import {
@@ -62,6 +64,7 @@
         chatFoldedState,
         chatFoldedStateMessageIndex,
         downloadFile,
+        getFileSrc,
     } from "src/ts/globalApi.svelte";
     import { runTrigger } from "src/ts/process/triggers";
     import { v4 } from "uuid";
@@ -78,6 +81,8 @@
     import Chats from "./Chats.svelte";
     import Button from "../UI/GUI/Button.svelte";
     import PluginDefinedIcon from "../Others/PluginDefinedIcon.svelte";
+    import { changeUserPersona } from "src/ts/persona";
+    import ListedPersona from "../Setting/listedPersona.svelte";
 
     interface Props {
         openModuleList?: boolean;
@@ -97,6 +102,7 @@
     let toggleStickers: boolean = $state(false);
     let fileInput: string[] = $state([]);
     let showNewMessageButton = $state(false);
+    let showPersonaList = $state(false);
     let chatsInstance: any = $state();
     let isScrollingToMessage = $state(false);
     let {
@@ -653,6 +659,11 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+
+{#if showPersonaList}
+    <ListedPersona close={() => showPersonaList = false} />
+{/if}
+
 <div
     class="w-full h-full relative"
     style={customStyle}
@@ -791,6 +802,32 @@
                             {send}
                         />
                     </div>
+
+                    <!-- Persona Selector - 입력창 위에 현재 페르소나 표시 -->
+                    <button
+                        class="flex items-center gap-2 px-2 py-1 mb-1 rounded-md hover:bg-selected transition-colors text-textcolor text-sm w-fit"
+                        onclick={() => showPersonaList = true}
+                    >
+                        {#if userIcon}
+                            {#await getFileSrc(userIcon)}
+                                <div class="w-6 h-6 rounded-full bg-darkbutton flex items-center justify-center">
+                                    <UserIcon size={14} />
+                                </div>
+                            {:then iconSrc}
+                                <img src={iconSrc} alt={currentUsername} class="w-6 h-6 rounded-full object-cover" />
+                            {:catch}
+                                <div class="w-6 h-6 rounded-full bg-darkbutton flex items-center justify-center">
+                                    <UserIcon size={14} />
+                                </div>
+                            {/await}
+                        {:else}
+                            <div class="w-6 h-6 rounded-full bg-darkbutton flex items-center justify-center">
+                                <UserIcon size={14} />
+                            </div>
+                        {/if}
+                        <span class="text-textcolor2">{currentUsername}</span>
+                        <ChevronDownIcon size={14} class="text-textcolor2" />
+                    </button>
 
                     <!-- 채팅창 (relative, z-10, 배경색 있음) -> Suggestion 위를 덮음 -->
                     <!-- rounded-md 추가: 컨테이너 배경이 둥근 버튼 뒤에서 직각으로 튀어나오는 것 방지 -->

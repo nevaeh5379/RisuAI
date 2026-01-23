@@ -1,10 +1,13 @@
 export function longpress(node:HTMLElement, callback:(e:MouseEvent|TouchEvent)=>void) {
 	const TIME_MS = 500;
 	const MOVE_THRESHOLD = 10; // pixels - if touch moves more than this, cancel longpress
+	const SELECTION_CHECK_INTERVAL = 50; // ms - how often to check for text selection
 	let timeoutPtr: number;
+	let selectionCheckInterval: number;
 	let startX = 0;
 	let startY = 0;
 	let cancelled = false;
+	let initialSelection = '';
 
 	// Check if there's an active text selection
 	function hasTextSelection(): boolean {
@@ -12,36 +15,58 @@ export function longpress(node:HTMLElement, callback:(e:MouseEvent|TouchEvent)=>
 		return selection !== null && selection.toString().length > 0;
 	}
 
+	// Check if selection has changed (indicating user is selecting text)
+	function hasSelectionChanged(): boolean {
+		const selection = window.getSelection();
+		const currentSelection = selection?.toString() || '';
+		return currentSelection !== initialSelection;
+	}
+
+	// Start periodic selection checking
+	function startSelectionCheck() {
+		initialSelection = window.getSelection()?.toString() || '';
+		selectionCheckInterval = window.setInterval(() => {
+			if (hasSelectionChanged() || hasTextSelection()) {
+				cancelled = true;
+				cleanup();
+			}
+		}, SELECTION_CHECK_INTERVAL);
+	}
+
+	// Cleanup all listeners and timers
+	function cleanup() {
+		window.clearTimeout(timeoutPtr);
+		window.clearInterval(selectionCheckInterval);
+		window.removeEventListener('mousemove', handleMouseMoveBeforeLong);
+		window.removeEventListener('touchmove', handleTouchMoveBeforeLong);
+		document.removeEventListener('selectionchange', handleSelectionChange);
+	}
+
 	// Mouse event handlers
 	function handleMouseDown(e:MouseEvent) {
 		cancelled = false;
 		window.addEventListener('mousemove', handleMouseMoveBeforeLong);
-		window.addEventListener('selectionchange', handleSelectionChange);
+		document.addEventListener('selectionchange', handleSelectionChange);
+		startSelectionCheck();
 		timeoutPtr = window.setTimeout(() => {
-			window.removeEventListener('mousemove', handleMouseMoveBeforeLong);
-			window.removeEventListener('selectionchange', handleSelectionChange);
+			cleanup();
 			if (!cancelled && !hasTextSelection()) {
 				callback(e);
 			}
 		}, TIME_MS);
 	}
 	function handleMouseMoveBeforeLong(e:MouseEvent) {
-		window.clearTimeout(timeoutPtr); 
-		window.removeEventListener('mousemove', handleMouseMoveBeforeLong);
-		window.removeEventListener('selectionchange', handleSelectionChange);
+		cleanup();
 	}
 	function handleMouseUp(e:MouseEvent) {
-		window.clearTimeout(timeoutPtr); 
-		window.removeEventListener('mousemove', handleMouseMoveBeforeLong);
-		window.removeEventListener('selectionchange', handleSelectionChange);
+		cleanup();
 	}
 
 	// Handle text selection starting
 	function handleSelectionChange() {
-		if (hasTextSelection()) {
+		if (hasTextSelection() || hasSelectionChanged()) {
 			cancelled = true;
-			window.clearTimeout(timeoutPtr);
-			window.removeEventListener('selectionchange', handleSelectionChange);
+			cleanup();
 		}
 	}
 
@@ -54,13 +79,15 @@ export function longpress(node:HTMLElement, callback:(e:MouseEvent|TouchEvent)=>
 			startY = touch.clientY;
 			window.addEventListener('touchmove', handleTouchMoveBeforeLong);
 			document.addEventListener('selectionchange', handleSelectionChange);
+			startSelectionCheck();
 			timeoutPtr = window.setTimeout(() => {
-				window.removeEventListener('touchmove', handleTouchMoveBeforeLong);
-				document.removeEventListener('selectionchange', handleSelectionChange);
-				// Only fire callback if no text selection and not cancelled
-				if (!cancelled && !hasTextSelection()) {
-					callback(e);
-				}
+				cleanup();
+				// Final check right before firing - give browser a moment to update selection
+				requestAnimationFrame(() => {
+					if (!cancelled && !hasTextSelection() && !hasSelectionChanged()) {
+						callback(e);
+					}
+				});
 			}, TIME_MS);
 		}
 	}
@@ -72,16 +99,12 @@ export function longpress(node:HTMLElement, callback:(e:MouseEvent|TouchEvent)=>
 			// Cancel longpress if finger moved beyond threshold (likely text selection)
 			if (deltaX > MOVE_THRESHOLD || deltaY > MOVE_THRESHOLD) {
 				cancelled = true;
-				window.clearTimeout(timeoutPtr);
-				window.removeEventListener('touchmove', handleTouchMoveBeforeLong);
-				document.removeEventListener('selectionchange', handleSelectionChange);
+				cleanup();
 			}
 		}
 	}
 	function handleTouchEnd(e:TouchEvent) {
-		window.clearTimeout(timeoutPtr);
-		window.removeEventListener('touchmove', handleTouchMoveBeforeLong);
-		document.removeEventListener('selectionchange', handleSelectionChange);
+		cleanup();
 	}
 
 	node.addEventListener('mousedown', handleMouseDown);
@@ -91,15 +114,11 @@ export function longpress(node:HTMLElement, callback:(e:MouseEvent|TouchEvent)=>
 
 	return {
 		destroy: () => {
-			window.clearTimeout(timeoutPtr);
+			cleanup();
 			node.removeEventListener('mousedown', handleMouseDown);
 			node.removeEventListener('mouseup', handleMouseUp);
 			node.removeEventListener('touchstart', handleTouchStart);
 			node.removeEventListener('touchend', handleTouchEnd);
-			window.removeEventListener('mousemove', handleMouseMoveBeforeLong);
-			window.removeEventListener('touchmove', handleTouchMoveBeforeLong);
-			window.removeEventListener('selectionchange', handleSelectionChange);
-			document.removeEventListener('selectionchange', handleSelectionChange);
 		}
 	};
 }
