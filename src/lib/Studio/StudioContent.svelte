@@ -17,6 +17,17 @@
         tabKey: string,
         onClose?: () => void
     }>();
+    
+    let isMobile = $state(false);
+
+    $effect(() => {
+        const checkMobile = () => {
+            isMobile = window.innerWidth <= 640;
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    });
 
     $effect(() => {
         if (char) {
@@ -134,7 +145,7 @@
                     </Button>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="flex flex-col gap-1">
                         <span class="font-bold">Comment</span>
                         <TextInput bind:value={char.customscript[index].comment} placeholder="Comment" />

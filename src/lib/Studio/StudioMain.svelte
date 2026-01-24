@@ -24,6 +24,18 @@
 
     let rightSidebarOpen = $state(false);
 
+    let isMobile = $state(false);
+
+    $effect(() => {
+        const checkMobile = () => {
+            isMobile = window.innerWidth <= 640;
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    });
+
     // Initialize with Chat and Settings
     $effect(() => {
         if (StudioState.tabs.length === 0 && StudioState.floatingWindows.length === 0 && char) {
@@ -53,13 +65,13 @@
 
 <!-- Main Studio Layout (VSCode Style) -->
 {#if char}
-    <div class="flex h-full w-full bg-[#1e1e1e] text-[#cccccc] font-sans overflow-hidden">
+    <div class="flex w-full bg-[#1e1e1e] text-[#cccccc] font-sans overflow-hidden {isMobile ? 'h-[100dvh]' : 'h-full'}">
         
         <!-- Center Content Area with Tabs -->
         <div class="flex-1 flex flex-col min-w-0 bg-[#1e1e1e]">
             {#if tabs.length > 0}
                 <!-- Tab Bar -->
-                <div class="flex bg-[#252526] border-b border-[#3e3e42] overflow-x-auto n-scroll shrink-0 h-9 items-end">
+                <div class="flex bg-[#252526] border-b border-[#3e3e42] overflow-x-auto n-scroll shrink-0 h-9 items-end {isMobile ? 'pl-12' : ''}">
                     {#each tabs as tab (tab.id)}
                         <div 
                             class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none max-w-48 group shrink-0 border-r border-[#3e3e42] h-full relative {activeTabId === tab.id ? 'bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]' : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e]'}"

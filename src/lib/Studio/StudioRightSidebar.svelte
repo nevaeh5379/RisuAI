@@ -82,7 +82,7 @@
     ></div>
 {/if}
 
-<div class="{isMobile ? 'fixed inset-y-0 right-0 z-50 border-l border-[#3e3e42]' : 'border-l border-[#3e3e42] shadow-xl'} w-80 h-full bg-[#252526] flex flex-col shadow-xl">
+<div class="{isMobile ? 'fixed inset-y-0 right-0 z-50 border-l border-[#3e3e42]' : 'border-l border-[#3e3e42] shadow-xl'} {isMobile ? 'w-full' : 'w-80'} h-full bg-[#252526] flex flex-col shadow-xl">
     <div class="px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center bg-[#252526] h-9 shrink-0 border-b border-[#3e3e42] text-[#cccccc]">
         <div class="flex gap-2 items-center">
              <button 
