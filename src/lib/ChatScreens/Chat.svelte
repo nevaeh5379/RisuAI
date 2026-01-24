@@ -1739,7 +1739,7 @@
     use:longpress={(e) => openContextMenu(e, true)}
 >
     <div
-        class="text-textcolor mt-1 ml-4 mr-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full"
+        class="text-textcolor mt-1 mx-0 md:mx-4 mb-1 p-2 bg-transparent grow border-t-gray-900 border-opacity/30 border-transparent flexium items-start max-w-full"
     >
         {#if DBState.db.theme === "mobilechat" && !blankMessage}
             <div

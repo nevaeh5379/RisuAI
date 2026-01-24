@@ -184,16 +184,16 @@
 {#if isMobile && !activeSidebarTab}
     <!-- Floating Hamburger for Mobile -->
     <button 
-        class="fixed top-2 left-2 z-60 p-2 bg-[#1e1e1e] text-[#cccccc] rounded-lg shadow-lg border border-[#3e3e42] hover:bg-[#2d2d2d]"
+        class="fixed top-2 left-2 z-[210] p-2 bg-[#1e1e1e] text-[#cccccc] rounded-lg shadow-lg border border-[#3e3e42] hover:bg-[#2d2d2d]"
         onclick={() => activeSidebarTab = 'characters'}
     >
         <BotIcon size="20" />
     </button>
 {/if}
 
-<div class="{isMobile ? 'fixed inset-y-0 left-0 z-50 flex shadow-2xl transition-transform duration-300' : 'flex h-full select-none border-r border-[#252526]'} {isMobile && !activeSidebarTab ? '-translate-x-full' : 'translate-x-0'} bg-[#333333]">
+<div class="{isMobile ? 'fixed inset-y-0 left-0 z-[200] flex shadow-2xl transition-transform duration-300' : 'flex h-full select-none border-r border-[#252526]'} {isMobile && !activeSidebarTab ? '-translate-x-full' : 'translate-x-0'} bg-[#333333]">
     <!-- Activity Bar (Far Left) -->
-    <div class="w-12 flex flex-col items-center py-2 gap-4 text-[#858585] z-50 bg-[#333333] shrink-0">
+    <div class="w-12 flex flex-col items-center py-2 gap-4 text-[#858585] z-[200] bg-[#333333] shrink-0">
         <button 
             class="p-2 hover:text-white relative group {$selectedCharID === -1 ? 'text-white' : ''}" 
             title="Dashboard"
@@ -576,7 +576,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events -->
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div 
-        class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+        class="fixed inset-0 bg-black/50 z-[150] transition-opacity duration-300"
         onclick={() => activeSidebarTab = null}
     ></div>
 {/if}

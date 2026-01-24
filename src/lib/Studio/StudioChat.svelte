@@ -470,14 +470,14 @@
 
     function updateInputTranslateSize() {
         if (inputTranslateEle) {
-            inputTranslateEle.style.height = "0";
+            inputTranslateEle.style.height = "auto";
             inputTranslateHeight = inputTranslateEle.scrollHeight + "px";
             inputTranslateEle.style.height = inputTranslateHeight;
         }
     }
     function updateInputSize() {
         if (inputEle) {
-            inputEle.style.height = "0";
+            inputEle.style.height = "auto";
             inputHeight = inputEle.scrollHeight + "px";
             inputEle.style.height = inputHeight;
         }
@@ -517,7 +517,7 @@
 <div class="flex flex-col h-full w-full bg-[#1e1e1e] text-[#cccccc] relative" style="--risu-theme-bgcolor: #1e1e1e; --risu-theme-textcolor: #cccccc; --risu-theme-darkbg: #252526; --risu-theme-darkborderc: #3e3e42;">
      <!-- Messages Area (Using Chats Component) -->
      <div 
-        class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pb-48 studio-chat-screen scroll-smooth default-chat-screen flex flex-col-reverse"
+        class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-4 px-0 md:px-4 pb-48 studio-chat-screen scroll-smooth default-chat-screen flex flex-col-reverse"
         onscroll={(e) => {
              const target = e.target as HTMLElement;
              // In flex-col-reverse, scrollTop works differently (0 is usually bottom or top depending on browser implementation of flex-reverse scrolling, 
@@ -602,7 +602,7 @@
      </div>
 
      <!-- Input Area (Floating Island Design) -->
-    <div class="absolute bottom-6 w-full px-4 flex justify-center z-10 pointer-events-none">
+    <div class="absolute bottom-6 w-full px-4 flex justify-center pointer-events-none">
         <div class="w-full max-w-4xl pointer-events-auto flex flex-col gap-2">
             <!-- Suggestions -->
             <div class="w-full">
@@ -613,7 +613,7 @@
                 <!-- Option Menu -->
                 {#if openMenu}
                     <div
-                        class="absolute bottom-full mb-2 right-0 p-2 bg-[#252526]/90 backdrop-blur-xl flex flex-col gap-1 text-[#cccccc] rounded-2xl shadow-2xl border border-[#3e3e42]/50 z-50 text-xs min-w-[200px]"
+                        class="absolute bottom-full mb-4 right-0 p-2 bg-[#18181b]/95 backdrop-blur-xl flex flex-col gap-1 text-[#cccccc] rounded-2xl shadow-2xl border border-white/10 z-50 text-xs min-w-[200px]"
                         onclick={(e) => {
                             e.stopPropagation();
                         }}
@@ -778,65 +778,79 @@
                     </div>
                 {/if}
 
-                <!-- Main Input Box -->
-                <div class="backdrop-blur-2xl bg-black/40 border border-white/10 rounded-3xl shadow-2xl p-3 flex flex-col gap-2 transition-all duration-300 focus-within:ring-1 focus-within:ring-white/20 focus-within:bg-black/50 hover:bg-black/50">
-                    <div class="flex items-center gap-3 px-2">
-                        <div class="flex-1 flex flex-col min-w-0">
-                             {#if DBState.db.useAutoTranslateInput}
+                <!-- Main Input Bar (Capsule Design) -->
+                <div class="relative w-full rounded-[28px] z-50 group shadow-2xl isolate pointer-events-auto">
+                    <!-- Rotating White Light Border -->
+                    {#if $doingChat}
+                        <div class="absolute -inset-[2px] rounded-[30px] pointer-events-none z-0 overflow-hidden">
+                             <div class="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_270deg,#ffffff_360deg)] animate-[spin_2.5s_linear_infinite] opacity-100"></div>
+                             <!-- Inner mask to create border effect -->
+                             <div class="absolute inset-[2px] bg-black rounded-[28px]"></div>
+                        </div>
+                    {/if}
+
+                    <!-- Input Container -->
+                    <div class="relative z-10 bg-black/40 backdrop-blur-2xl border border-white/10 rounded-[28px] flex items-center gap-2 p-2 transition-all duration-300 hover:border-white/20 hover:bg-black/50 focus-within:bg-black/60 focus-within:border-white/30 pointer-events-auto">
+                        
+                        <!-- Center: Text Area -->
+                        <div class="flex-1 min-w-0 py-2 pl-4">
+                            {#if DBState.db.useAutoTranslateInput}
                                 <textarea
                                     bind:this={inputTranslateEle}
                                     bind:value={messageInputTranslate}
-                                    class="w-full bg-transparent resize-none outline-none text-sm text-gray-400 border-b border-white/10 pb-2 mb-2 font-mono leading-relaxed"
-                                    placeholder="Translation Input" 
-                                     style:height={inputTranslateHeight}
-                                     style:max-height={"200px"}
-                                     rows="1"
-                                     oninput={() => { updateInputTranslateSize(); updateInputTransateMessage(true); }}
+                                    class="w-full bg-transparent resize-none outline-none text-sm text-zinc-500 border-b border-white/10 pb-1 mb-1 font-mono leading-relaxed pointer-events-auto min-h-[24px]"
+                                    placeholder="Translation..." 
+                                    style:height={inputTranslateHeight}
+                                    style:max-height={"200px"}
+                                    rows="1"
+                                    oninput={() => { updateInputTranslateSize(); updateInputTransateMessage(true); }}
                                 ></textarea>
                             {/if}
-                             <textarea
+                            <textarea
                                 bind:this={inputEle}
                                 bind:value={messageInput}
-                                 class="w-full bg-transparent resize-none outline-none text-base text-[#e0e0e0] placeholder-[#808080] font-sans leading-relaxed max-h-[400px]"
-                                 placeholder="Send a message..."
-                                 style:height={inputHeight}
-                                 rows="1"
-                                 oninput={() => { updateInputSize(); updateInputTransateMessage(false); }}
-                                 onkeydown={(e) => {
+                                class="w-full bg-transparent resize-none outline-none text-[16px] text-white placeholder-zinc-600 font-sans leading-relaxed max-h-[400px] pointer-events-auto min-h-[24px]"
+                                placeholder="Message..."
+                                style:height={inputHeight}
+                                rows="1"
+                                oninput={() => { updateInputSize(); updateInputTransateMessage(false); }}
+                                onkeydown={(e) => {
                                     if (e.key === "Enter" && !e.shiftKey) {
                                         e.preventDefault();
                                         if($doingChat) abortChat();
                                         else send();
                                     }
-                                 }}
+                                }}
                             ></textarea>
-                         </div>
-        
-                         <div class="flex items-center pb-0.5 gap-2 shrink-0">
-                             <!-- Option Button -->
-                             <button 
-                                class="p-2.5 rounded-full hover:bg-white/10 text-[#a0a0a0] hover:text-white transition-colors"
+                        </div>
+    
+                        <!-- Right: Buttons Group -->
+                        <div class="flex items-center gap-1 shrink-0 pr-1">
+                            <!-- Option Button (Moved to Right) -->
+                            <button 
+                                class="p-3 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 transition-all duration-200"
                                 onclick={(e) => { e.stopPropagation(); openMenu = !openMenu; }}
                                 title="Options"
-                             >
-                                <MenuIcon size={20} />
-                             </button>
-    
-                             {#if $doingChat}
-                                <button class="p-2.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 transition-all active:scale-95" onclick={abortChat} title="Stop Generation">
-                                    <div class="w-3 h-3 bg-red-400 rounded-sm"></div> 
+                            >
+                                <MenuIcon size={22} />
+                            </button>
+
+                            <!-- Send/Stop Button -->
+                            {#if $doingChat}
+                                <button class="w-11 h-11 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(255,255,255,0.4)] transition-all" onclick={abortChat} title="Stop">
+                                    <div class="w-3.5 h-3.5 bg-black rounded-[2px]"></div> 
                                 </button>
-                             {:else}
-                                <button class="p-2.5 rounded-full hover:bg-white/10 text-[#a0a0a0] hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed" onclick={send} disabled={messageInput.trim() === '' && fileInput.length === 0}>
-                                     <ArrowDown size={20} />
+                            {:else}
+                                <button class="w-11 h-11 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(255,255,255,0.2)] transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-600 disabled:shadow-none" onclick={send} disabled={messageInput.trim() === '' && fileInput.length === 0}>
+                                    <ArrowDown size={22} strokeWidth={2.5} />
                                 </button>
-                             {/if}
-                         </div>
+                            {/if}
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="text-[10px] text-gray-500 text-right px-4 font-medium opacity-60">
+            <div class="text-[10px] text-zinc-600 text-right px-4 font-medium opacity-0 group-hover:opacity-60 transition-opacity duration-300">
                  Return to send, Shift + Return for new line
             </div>
         </div>
