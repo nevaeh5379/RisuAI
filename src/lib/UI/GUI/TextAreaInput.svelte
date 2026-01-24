@@ -259,13 +259,17 @@
 
 {#if DBState.db.useMonacoEditor && !$MobileGUI}
     <div
-        class={"border border-darkborderc relative n-scroll focus-within:border-borderc rounded-md shadow-xs text-textcolor bg-transparent focus-within:ring-borderc focus-within:ring-2 focus-within:outline-hidden transition-colors duration-200 z-20 focus-within:z-40 " +
+        class={"border border-darkborderc relative n-scroll focus-within:border-borderc rounded-md shadow-xs text-textcolor bg-transparent focus-within:ring-borderc focus-within:ring-2 focus-within:outline-hidden transition-colors duration-200 z-20 focus-within:z-40 no-drag no-sort " +
             (className ? " " + className : "")}
         class:mb-4={margin === "bottom"}
         class:mb-2={margin === "both"}
         class:mt-4={margin === "top"}
         class:mt-2={margin === "both"}
         style="height: {height === 'full' ? '100%' : 'auto'};"
+        onkeydown={(e) => e.stopPropagation()}
+        onkeyup={(e) => e.stopPropagation()}
+        onkeypress={(e) => e.stopPropagation()}
+        role="presentation"
     >
         <MonacoEditor
             bind:value

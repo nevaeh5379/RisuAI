@@ -161,5 +161,29 @@
                 Script not found or deleted.
             </div>
         {/if}
+    {:else if tabKey.startsWith('field:')}
+        {@const field = tabKey.split(':')[1]}
+        <div class="flex flex-col h-full gap-2">
+            <h2 class="text-xl font-bold capitalize">{language[field as keyof typeof language] || field}</h2>
+            <div class="flex-1 min-h-0">
+                {#if field === 'description'}
+                    <TextAreaInput bind:value={(char as character).desc} height="full" />
+                {:else if field === 'firstMessage'}
+                    <TextAreaInput bind:value={char.firstMessage} height="full" />
+                {:else if field === 'creatorNotes'}
+                    <TextAreaInput bind:value={char.creatorNotes} height="full" />
+                {:else if field === 'exampleMessage'}
+                    <TextAreaInput bind:value={char.exampleMessage} height="full" />
+                {:else if field === 'systemPrompt'}
+                    <TextAreaInput bind:value={char.systemPrompt} height="full" />
+                {:else if field === 'backgroundHTML'}
+                    <TextAreaInput bind:value={char.backgroundHTML} height="full" />
+                {:else if field === 'name'}
+                    <TextInput bind:value={char.name} size="lg" />
+                {:else}
+                    <div class="text-red-500">Unknown field: {field}</div>
+                {/if}
+            </div>
+        </div>
     {/if}
 </div>

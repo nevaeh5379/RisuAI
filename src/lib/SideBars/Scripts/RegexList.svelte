@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { customscript } from "src/ts/storage/database.svelte";
     import RegexData from "./RegexData.svelte";
-    import Sortable from "sortablejs";
+    import Sortable from "sortablejs/modular/sortable.core.esm.js";
     import { sleep, sortableOptions } from "src/ts/util";
     import { onDestroy, onMount } from "svelte";
   import { DownloadIcon, HardDriveUploadIcon, PlusIcon } from "@lucide/svelte";

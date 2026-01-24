@@ -25,8 +25,7 @@
     BookIcon,
     ChevronDown,
     ChevronRight,
-    PanelLeftClose,
-    FileCog
+    PanelLeftClose
   } from "@lucide/svelte";
     import {
     changeChar,
@@ -39,27 +38,13 @@
     import SidebarIndicator from "../SideBars/SidebarIndicator.svelte";
     import { v4 } from "uuid";
   import { changeChatTo } from "src/ts/globalApi.svelte";
-  import { openStudioTab } from "./studioStore.svelte";
-  import type { character, customscript, loreBook } from "src/ts/storage/database.svelte";
+  import type { character } from "src/ts/storage/database.svelte";
 
   let charImages: any[] = $state([]);
   let openFolders:string[] = $state([])
 
-  let activeSidebarTab: 'characters' | 'chats' | 'search' | 'explorer' | null = $state('characters'); 
+  let activeSidebarTab: 'characters' | 'chats' | 'search' | null = $state('characters'); 
   let isMobile = $state(false);
-
-  // Bot Settings (Explorer) State
-  let expandedBasic = $state(true);
-  let expandedLore = $state(true);
-  let expandedRegex = $state(true);
-  let explorerFolders = $state<Set<string>>(new Set());
-
-  // Derived char for Explorer
-  let char = $derived(
-      $selectedCharID !== -1 && DBState.db?.characters?.length > $selectedCharID 
-      ? DBState.db.characters[$selectedCharID] as character 
-      : null
-  );
 
   // Mobile detection
   $effect(() => {
@@ -189,94 +174,13 @@
       DBState.db.characters[$selectedCharID].chatFolders.push(newFolder);
   }
 
-  // Explorer Functions
-  function toggleExplorerFolder(key: string) {
-        const newSet = new Set(explorerFolders);
-        if (newSet.has(key)) {
-            newSet.delete(key);
-        } else {
-            newSet.add(key);
-        }
-        explorerFolders = newSet;
-    }
-
-    function addRegex() {
-        if (!char) return;
-        const newScript: customscript = {
-            comment: 'New Script',
-            in: '',
-            out: '',
-            type: 'regex',
-            flag: 'gm'
-        };
-        if(!char.customscript) char.customscript = [];
-        char.customscript.push(newScript);
-        openStudioTab(`regex:${char.customscript.length - 1}`, newScript.comment || 'New Script', CodeIcon);
-    }
-
-    function addLorebook(folderKey?: string) {
-        if (!char) return;
-        const newBook: loreBook = {
-            id: v4(),
-            key: '',
-            secondkey: '',
-            comment: 'New Entry',
-            content: '',
-            mode: 'normal',
-            insertorder: 100,
-            alwaysActive: true,
-            selective: false,
-            folder: folderKey
-        };
-        char.globalLore.push(newBook);
-        
-        // Auto open
-        openStudioTab(`lore:${char.globalLore.length - 1}`, newBook.comment || 'New Entry', BookIcon);
-
-        if (folderKey) {
-            const newSet = new Set(explorerFolders);
-            newSet.add(folderKey);
-            explorerFolders = newSet;
-        }
-    }
-
-    function addLoreFolder() {
-        if (!char) return;
-        const newBook: loreBook = {
-            id: v4(),
-            key: v4(),
-            secondkey: '',
-            comment: 'New Folder',
-            content: '',
-            mode: 'folder',
-            insertorder: 100,
-            alwaysActive: true,
-            selective: false
-        };
-        char.globalLore.push(newBook);
-    }
-
-    function getLoreItems(items: loreBook[], folderKey?: string, depth: number = 0): any[] {
-        let result: any[] = [];
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            if ((!folderKey && !item.folder) || (item.folder === folderKey)) {
-                result.push({ item, depth, index: i });
-                if (item.mode === 'folder' && explorerFolders.has(item.key)) {
-                    result = result.concat(getLoreItems(items, item.key, depth + 1));
-                }
-            }
-        }
-        return result;
-    }
-
 
 </script>
 
 {#if isMobile && !activeSidebarTab}
     <!-- Floating Hamburger for Mobile -->
     <button 
-        class="fixed top-2 left-2 z-[60] p-2 bg-[#1e1e1e] text-[#cccccc] rounded-lg shadow-lg border border-[#3e3e42] hover:bg-[#2d2d2d]"
+        class="fixed top-2 left-2 z-60 p-2 bg-[#1e1e1e] text-[#cccccc] rounded-lg shadow-lg border border-[#3e3e42] hover:bg-[#2d2d2d]"
         onclick={() => activeSidebarTab = 'characters'}
     >
         <BotIcon size="20" />
@@ -313,20 +217,7 @@
             <BotIcon size="24" />
         </button>
 
-        {#if $selectedCharID >= 0}
-        {#if $selectedCharID >= 0}
-            <button 
-                class="p-2 hover:text-white relative group {activeSidebarTab === 'explorer' ? 'text-white' : ''}" 
-                title="Bot Settings"
-                onclick={() => activeSidebarTab = activeSidebarTab === 'explorer' ? null : 'explorer'}
-            >
-                {#if activeSidebarTab === 'explorer'}
-                    <div class="absolute left-0 top-2 bottom-2 w-0.5 bg-white"></div>
-                {/if}
-                <FileCog size="24" />
-            </button>
-        {/if}
-        {/if}
+
 
         <!-- Chats Tab -->
         <button 
@@ -355,7 +246,7 @@
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div class="w-64 bg-[#252526] flex flex-col text-[#cccccc] text-xs {isMobile ? 'border-r border-[#3e3e42] h-full shadow-2xl' : ''}">
             <div class="px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center bg-[#252526] h-9 shrink-0">
-                <span class="truncate">{activeSidebarTab === 'characters' ? 'CHARACTERS' : (activeSidebarTab === 'chats' ? 'CHATS' : (activeSidebarTab === 'explorer' ? 'BOT SETTINGS' : 'SEARCH'))}</span>
+                <span class="truncate">{activeSidebarTab === 'characters' ? 'CHARACTERS' : (activeSidebarTab === 'chats' ? 'CHATS' : 'SEARCH')}</span>
                 
                 <div class="flex items-center">
                     {#if activeSidebarTab === 'chats' && $selectedCharID >= 0}
@@ -451,113 +342,6 @@
                     {/each}
                 {:else}
                     <div class="p-4 text-center text-[#858585]">Base Character Not Selected</div>
-                {/if}
-            {/if}
-
-            <!-- BOT SETTINGS View -->
-            {#if activeSidebarTab === 'explorer'}
-                {#if char}
-                    <div class="flex flex-col">
-                        <!-- Basic Info -->
-                        <div>
-                            <button class="w-full flex items-center gap-1 p-1 hover:bg-[#2a2d2e] text-[#cccccc] font-bold text-xs" onclick={() => expandedBasic = !expandedBasic}>
-                                {#if expandedBasic}<ChevronDown size="14"/>{:else}<ChevronRight size="14"/>{/if}
-                                <span>Basic Info</span>
-                            </button>
-                            {#if expandedBasic}
-                            <div class="flex flex-col gap-0.5 mt-0.5">
-                                <button class="w-full text-left pl-6 py-1 hover:bg-[#2a2d2e] focus:bg-[#094771] focus:text-white text-[#cccccc] flex items-center gap-2 text-xs" onclick={() => openStudioTab('basic:all', language.characterSettings, Settings)}>
-                                    <Settings size="12" class="text-gray-400" /> {language.characterSettings}
-                                </button>
-                            </div>
-                            {/if}
-                        </div>
-
-                        <!-- Lorebook -->
-                        <div class="mt-1">
-                            <div role="button" tabindex="0" class="w-full flex items-center justify-between p-1 hover:bg-[#2a2d2e] text-[#cccccc] font-bold text-xs cursor-pointer group" onclick={() => expandedLore = !expandedLore} onkeydown={(e) => e.key === 'Enter' && (expandedLore = !expandedLore)}>
-                                <div class="flex items-center gap-1">
-                                    {#if expandedLore}<ChevronDown size="14"/>{:else}<ChevronRight size="14"/>{/if}
-                                    <span>{language.loreBook}</span>
-                                </div>
-                                <div class="flex gap-1 mr-1 opacity-0 group-hover:opacity-100">
-                                    <button class="p-0.5 hover:bg-[#3e3e42] rounded" title="Add Folder" onclick={(e) => { e.stopPropagation(); addLoreFolder(); }}>
-                                        <FolderIcon size="12" />
-                                    </button>
-                                    <button class="p-0.5 hover:bg-[#3e3e42] rounded" title="Add Entry" onclick={(e) => { e.stopPropagation(); addLorebook(); }}>
-                                        <Plus size="12" />
-                                    </button>
-                                </div>
-                            </div>
-                            {#if expandedLore}
-                                <div class="flex flex-col gap-0.5 mt-0.5">
-                                    {#each getLoreItems(char.globalLore) as { item, depth, index }}
-                                        <div style="padding-left: {depth * 12 + 24}px">
-                                            <div 
-                                                role="button" tabindex="0"
-                                                class="w-full text-left py-1 hover:bg-[#2a2d2e] focus:bg-[#094771] focus:text-white flex items-center gap-1.5 truncate cursor-pointer text-[#cccccc] text-xs group" 
-                                                onclick={() => {
-                                                    if (item.mode === 'folder') {
-                                                        toggleExplorerFolder(item.key);
-                                                    } else {
-                                                        openStudioTab(`lore:${index}`, item.comment || 'Unnamed Entry', BookIcon);
-                                                    }
-                                                }}
-                                                onkeydown={(e) => e.key === 'Enter' && (item.mode === 'folder' ? toggleExplorerFolder(item.key) : openStudioTab(`lore:${index}`, item.comment || 'Unnamed Entry', BookIcon))}
-                                            >
-                                                {#if item.mode === 'folder'}
-                                                    {#if explorerFolders.has(item.key)}<ChevronDown size="12"/>{:else}<ChevronRight size="12"/>{/if}
-                                                    <FolderIcon size="12" class="text-[#c69a5a] shrink-0" />
-                                                    <span class="truncate font-normal">{item.comment || 'Unnamed Folder'}</span>
-                                                    <button class="ml-auto p-0.5 hover:bg-[#3e3e42] rounded opacity-0 group-hover:opacity-100 mr-1" onclick={(e) => { e.stopPropagation(); addLorebook(item.key); }}>
-                                                        <Plus size="10" />
-                                                    </button>
-                                                {:else}
-                                                    <BookIcon size="12" class="shrink-0 text-blue-300 opacity-80" />
-                                                    <span class="truncate">{item.comment || 'Unnamed Entry'}</span>
-                                                {/if}
-                                            </div>
-                                        </div>
-                                    {/each}
-                                    {#if char.globalLore.length === 0}
-                                        <div class="text-[#666666] text-xs p-2 text-center">Empty</div>
-                                    {/if}
-                                </div>
-                            {/if}
-                        </div>
-
-                        <!-- Regex Scripts -->
-                        <div class="mt-1">
-                            <div role="button" tabindex="0" class="w-full flex items-center justify-between p-1 hover:bg-[#2a2d2e] text-[#cccccc] font-bold text-xs cursor-pointer group" onclick={() => expandedRegex = !expandedRegex} onkeydown={(e) => e.key === 'Enter' && (expandedRegex = !expandedRegex)}>
-                                <div class="flex items-center gap-1">
-                                    {#if expandedRegex}<ChevronDown size="14"/>{:else}<ChevronRight size="14"/>{/if}
-                                    <span>Regex Scripts</span>
-                                </div>
-                                <div class="flex gap-1 mr-1 opacity-0 group-hover:opacity-100">
-                                    <button class="p-0.5 hover:bg-[#3e3e42] rounded" title="Add Script" onclick={(e) => { e.stopPropagation(); addRegex(); }}>
-                                        <Plus size="12" />
-                                    </button>
-                                </div>
-                            </div>
-                            {#if expandedRegex && char.customscript}
-                                 <div class="flex flex-col gap-0.5 mt-0.5">
-                                    {#each char.customscript as script, i}
-                                        <button class="w-full text-left pl-6 py-1 hover:bg-[#2a2d2e] focus:bg-[#094771] focus:text-white text-[#cccccc] flex items-center gap-2 text-xs truncate" onclick={() => openStudioTab(`regex:${i}`, script.comment || 'New Script', CodeIcon)}>
-                                            <CodeIcon size="12" class="text-pink-400 shrink-0" /> <span class="truncate">{script.comment || 'New Script'}</span>
-                                        </button>
-                                    {/each}
-                                     {#if char.customscript.length === 0}
-                                        <div class="text-[#666666] text-xs p-2 text-center">Empty</div>
-                                    {/if}
-                                </div>
-                            {/if}
-                        </div>
-                    </div>
-                {:else}
-                    <div class="p-4 text-center text-[#858585]">
-                        <div class="mb-2">No Character Selected</div>
-                        <div class="text-xs opacity-70">Please select a character from the list or dashboard.</div>
-                    </div>
                 {/if}
             {/if}
         </div>
