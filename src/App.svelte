@@ -176,14 +176,14 @@
                     <Sidebar openGrid={() => {gridOpen = true}} hidden={!$sideBarStore} />
                 {/if}
             {:else}
-                <div class="top-0 w-full h-full left-0 z-30 flex flex-row items-center" class:fixed={$sideBarStore} class:hidden={!$sideBarStore} >
-                    <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    {#if DBState.db.studioLayout}
-                        <StudioSidebar />
-                    {:else}
+                {#if DBState.db.studioLayout}
+                    <StudioSidebar />
+                {:else}
+                    <div class="top-0 w-full h-full left-0 z-30 flex flex-row items-center" class:fixed={$sideBarStore} class:hidden={!$sideBarStore} >
+                        <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <Sidebar openGrid={() => {gridOpen = true}}  hidden={false} />
-                    {/if}
-                </div>
+                    </div>
+                {/if}
             {/if}
             {#if $studioModeOpen || DBState.db.studioLayout}
                 <StudioMain />

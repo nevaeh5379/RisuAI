@@ -492,7 +492,7 @@
 <div class="flex flex-col h-full w-full bg-[#1e1e1e] text-[#cccccc] relative" style="--risu-theme-bgcolor: #1e1e1e; --risu-theme-textcolor: #cccccc; --risu-theme-darkbg: #252526; --risu-theme-darkborderc: #3e3e42;">
      <!-- Messages Area (Using Chats Component) -->
      <div 
-        class="flex-1 overflow-y-auto overflow-x-hidden p-4 pb-48 studio-chat-screen scroll-smooth default-chat-screen flex flex-col-reverse"
+        class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-4 pb-48 studio-chat-screen scroll-smooth default-chat-screen flex flex-col-reverse"
         onscroll={(e) => {
              const target = e.target as HTMLElement;
              // In flex-col-reverse, scrollTop works differently (0 is usually bottom or top depending on browser implementation of flex-reverse scrolling, 

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { DBState, studioModeOpen, selectedCharID } from "src/ts/stores.svelte";
     import { language } from "src/lang";
-    import { XIcon, PlusIcon, MenuIcon, ChevronRight, ChevronDown, FolderIcon, BookIcon, ExternalLinkIcon, FileTextIcon, MessageSquareIcon, InfoIcon, Settings, CodeIcon, PlayIcon } from '@lucide/svelte';
+    import { XIcon, PlusIcon, MenuIcon, ChevronRight, ChevronDown, FolderIcon, BookIcon, ExternalLinkIcon, FileTextIcon, MessageSquareIcon, InfoIcon, Settings, CodeIcon, PlayIcon, PanelRightOpen } from '@lucide/svelte';
     import ChatScreen from "src/lib/ChatScreens/ChatScreen.svelte";
     import StudioChat from "./StudioChat.svelte";
     import Button from "../UI/GUI/Button.svelte";
@@ -11,6 +11,7 @@
     import type { character, loreBook, customscript } from "src/ts/storage/database.svelte";
     import { v4 } from "uuid";
     import StudioDashboard from "./StudioDashboard.svelte";
+    import StudioRightSidebar from "./StudioRightSidebar.svelte";
 
     let char = $derived(DBState.db.characters[$selectedCharID] as character);
 
@@ -20,6 +21,8 @@
     let tabs = $derived(StudioState.tabs);
     let activeTabId = $derived(StudioState.activeTabId);
     let floatingWindows = $derived(StudioState.floatingWindows);
+
+    let rightSidebarOpen = $state(false);
 
     // Initialize with Chat and Settings
     $effect(() => {
@@ -78,6 +81,14 @@
                             </div>
                         </div>
                     {/each}
+                    <div class="grow h-full border-b border-[#3e3e42]"></div>
+                    <button 
+                        class="px-3 h-full flex items-center justify-center hover:bg-[#3e3e42] text-[#cccccc] border-b border-[#3e3e42] {rightSidebarOpen ? 'bg-[#3e3e42] text-white' : ''}" 
+                        onclick={() => rightSidebarOpen = !rightSidebarOpen}
+                        title="Toggle Right Sidebar"
+                    >
+                        <PanelRightOpen size="16" />
+                    </button>
                 </div>
 
                 <!-- Tab Content -->
@@ -120,6 +131,9 @@
             {/if}
         </div>
 
+        {#if rightSidebarOpen}
+            <StudioRightSidebar onClose={() => rightSidebarOpen = false} />
+        {/if}
     </div>
 {:else}
     <StudioDashboard />
