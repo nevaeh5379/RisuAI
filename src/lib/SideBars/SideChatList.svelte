@@ -36,6 +36,7 @@
         alertNormal,
         alertSelect,
         alertStore,
+        alertInput,
     } from "src/ts/alert";
     import { findCharacterbyId, sleep, sortableOptions } from "src/ts/util";
     import { createMultiuserRoom } from "src/ts/sync/multiuser";
@@ -386,15 +387,7 @@
                                             chat,
                                         ) === chara.chatPage}
                                     >
-                                        {#if editMode}
-                                            <TextInput
-                                                bind:value={chat.name}
-                                                className="grow min-w-0"
-                                                padding={false}
-                                            />
-                                        {:else}
-                                            <span>{chat.name}</span>
-                                        {/if}
+                                        <span>{chat.name}</span>
                                         <div class="grow flex justify-end">
                                             {#if DBState.db.titleGeneration?.enabled !== false}
                                                 <div
@@ -512,6 +505,35 @@
                                                                 ),
                                                             );
                                                             createMultiuserRoom();
+                                                            break;
+                                                        }
+                                                        case 3: {
+                                                            const newName = await alertInput(
+                                                                "Rename",
+                                                                [[chat.name, "Start Value"]],
+                                                            );
+                                                            if (newName) {
+                                                                chat.name = newName;
+                                                                $ReloadGUIPointer += 1;
+                                                            }
+                                                            break;
+                                                        }
+                                                        case 4: {
+                                                            const validFolders = ["Root", ...(chara.chatFolders?.map(f => f.name) || [])];
+                                                            const selection = await alertSelect(validFolders);
+                                                            if (selection) {
+                                                                const idx = parseInt(selection);
+                                                                if (idx === 0) {
+                                                                    chat.folderId = null;
+                                                                    alertNormal("Moved to Root");
+                                                                } else {
+                                                                    const folder = chara.chatFolders[idx - 1];
+                                                                    chat.folderId = folder.id;
+                                                                    alertNormal(`Moved to ${folder.name}`);
+                                                                }
+                                                                $ReloadGUIPointer++;
+                                                            }
+                                                            break;
                                                         }
                                                     }
                                                 }}
@@ -527,8 +549,15 @@
                                                     }
                                                 }}
                                                 class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
-                                                onclick={() => {
-                                                    editMode = !editMode;
+                                                onclick={async () => {
+                                                    const newName = await alertInput(
+                                                        "Rename",
+                                                        [[chat.name, "Start Value"]],
+                                                    );
+                                                    if (newName) {
+                                                        chat.name = newName;
+                                                        $ReloadGUIPointer += 1;
+                                                    }
                                                 }}
                                             >
                                                 <PencilIcon size={18} />
@@ -616,15 +645,7 @@
                             class="flex items-center text-textcolor border-solid border-0 border-darkborderc p-2 cursor-pointer rounded-md"
                             class:bg-selected={i === chara.chatPage}
                         >
-                            {#if editMode}
-                                <TextInput
-                                    bind:value={chara.chats[i].name}
-                                    className="grow min-w-0"
-                                    padding={false}
-                                />
-                            {:else}
                                 <span>{chat.name}</span>
-                            {/if}
                             <div class="grow flex justify-end">
                                 {#if DBState.db.titleGeneration?.enabled !== false}
                                     <div
@@ -717,6 +738,35 @@
                                             case 2: {
                                                 changeChatTo(i);
                                                 createMultiuserRoom();
+                                                break;
+                                            }
+                                            case 3: {
+                                                const newName = await alertInput(
+                                                    "Rename",
+                                                    [[chat.name, "Start Value"]],
+                                                );
+                                                if (newName) {
+                                                    chat.name = newName;
+                                                    $ReloadGUIPointer += 1;
+                                                }
+                                                break;
+                                            }
+                                            case 4: {
+                                                    const validFolders = ["Root", ...(chara.chatFolders?.map(f => f.name) || [])];
+                                                    const selection = await alertSelect(validFolders);
+                                                    if (selection) {
+                                                        const idx = parseInt(selection);
+                                                        if (idx === 0) {
+                                                            chat.folderId = null;
+                                                            alertNormal("Moved to Root");
+                                                        } else {
+                                                            const folder = chara.chatFolders[idx - 1];
+                                                            chat.folderId = folder.id;
+                                                            alertNormal(`Moved to ${folder.name}`);
+                                                        }
+                                                        $ReloadGUIPointer++;
+                                                    }
+                                                    break;
                                             }
                                         }
                                     }}
@@ -732,8 +782,15 @@
                                         }
                                     }}
                                     class="text-textcolor2 hover:text-green-500 mr-1 cursor-pointer"
-                                    onclick={() => {
-                                        editMode = !editMode;
+                                    onclick={async () => {
+                                        const newName = await alertInput(
+                                            "Rename",
+                                            [[chat.name, "Start Value"]],
+                                        );
+                                        if (newName) {
+                                            chat.name = newName;
+                                            $ReloadGUIPointer += 1;
+                                        }
                                     }}
                                 >
                                     <PencilIcon size={18} />

@@ -38,6 +38,18 @@
     // let activeTab = $derived(StudioState.tabs.find(t => t.id === StudioState.activeTabId));
     // let activeLoreBook = ...
 
+    let isMobile = $state(false);
+
+    $effect(() => {
+        const checkMobile = () => {
+            isMobile = window.innerWidth <= 640;
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    });
+
     async function calculateTokens() {
         if (!char || !currentChat) return;
         isCalculating = true;
@@ -60,7 +72,17 @@
 
 </script>
 
-<div class="w-80 h-full bg-[#252526] flex flex-col border-l border-[#3e3e42] shadow-xl">
+{#if isMobile}
+    <!-- Backdrop for mobile -->
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div 
+        class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
+        onclick={onClose}
+    ></div>
+{/if}
+
+<div class="{isMobile ? 'fixed inset-y-0 right-0 z-50 border-l border-[#3e3e42]' : 'border-l border-[#3e3e42] shadow-xl'} w-80 h-full bg-[#252526] flex flex-col shadow-xl">
     <div class="px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center bg-[#252526] h-9 shrink-0 border-b border-[#3e3e42] text-[#cccccc]">
         <div class="flex gap-2 items-center">
              <button 
@@ -130,7 +152,7 @@
                         >
                             <RefreshCwIcon size="12" class={isCalculating ? 'animate-spin' : ''} />
                             {isCalculating ? 'Calculating...' : 'Refresh Token Count'}
-                         </button>
+                        </button>
                     </div>
                 </div>
                 

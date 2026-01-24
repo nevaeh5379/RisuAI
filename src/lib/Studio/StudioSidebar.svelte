@@ -39,9 +39,13 @@
     import { v4 } from "uuid";
   import { changeChatTo } from "src/ts/globalApi.svelte";
   import type { character } from "src/ts/storage/database.svelte";
+  import { alertInput, alertSelect, alertNormal, alertConfirm, alertError } from "src/ts/alert";
+  import { Pencil as PencilIcon, Trash2 as TrashIcon, MoreHorizontal as MenuIcon, Download as DownloadIcon } from "@lucide/svelte";
+  import { ReloadGUIPointer } from "src/ts/stores.svelte";
 
   let charImages: any[] = $state([]);
   let openFolders:string[] = $state([])
+  let editingId: string | null = $state(null);
 
   let activeSidebarTab: 'characters' | 'chats' | 'search' | null = $state('characters'); 
   let isMobile = $state(false);
@@ -326,19 +330,237 @@
             <!-- CHATS View -->
             {#if activeSidebarTab === 'chats'}
                 {#if $selectedCharID >= 0}
-                    <!-- TODO: Implement folder logic properly. For now showing flat list + folders if structure exists -->
-                    {#each DBState.db.characters[$selectedCharID].chats as chat, i}
-                        <div 
-                            class="flex items-center px-4 py-1 hover:bg-[#2a2d2e] cursor-pointer gap-2 {DBState.db.characters[$selectedCharID].chatPage === i ? 'bg-[#37373d] text-white' : ''}"
-                            onclick={() => {
-                                changeChatTo(i);
-                                window.dispatchEvent(new CustomEvent('studio-open-chat'));
-                            }}
-                            role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && changeChatTo(i)}
-                        >
-                             <MessageSquare size="14" class="shrink-0" />
-                             <span class="truncate">{chat.name}</span>
-                        </div>
+                    <!-- Folders -->
+                    {#if DBState.db.characters[$selectedCharID].chatFolders}
+                        {#each DBState.db.characters[$selectedCharID].chatFolders as folder, i}
+                            <div>
+                                <div
+                                    class="w-full flex items-center px-2 py-0.5 hover:bg-[#2a2d2e] cursor-pointer gap-1 text-[#cccccc] select-none text-left group"
+                                    onclick={() => {
+                                        folder.folded = !folder.folded;
+                                    }}
+                                    role="button"
+                                    tabindex="0"
+                                    onkeydown={(e) => { if(e.key === 'Enter') folder.folded = !folder.folded; }}
+                                >
+                                    <div class="flex items-center justify-center w-4 h-4 text-gray-400">
+                                         {#if !folder.folded}
+                                            <ChevronDown size="14" />
+                                         {:else}
+                                            <ChevronRight size="14" />
+                                         {/if}
+                                    </div>
+                                    {#if editingId === folder.id}
+                                        <input
+                                            bind:value={folder.name}
+                                            class="bg-[#3e3e42] text-white px-1 py-0.5 rounded flex-1 min-w-0 border border-blue-500 focus:outline-none text-xs"
+                                            autofocus
+                                            onblur={() => editingId = null}
+                                            onkeydown={(e) => {
+                                                if(e.key === 'Enter') editingId = null;
+                                                e.stopPropagation();
+                                            }}
+                                            onclick={(e) => e.stopPropagation()}
+                                        />
+                                    {:else}
+                                        <span class="font-bold truncate text-xs text-[#cccccc] flex-1">{folder.name}</span>
+                                    {/if}
+                                    
+                                    <!-- Folder Actions -->
+                                    <div class="hidden group-hover:flex items-center gap-1">
+                                        <button 
+                                            class="p-0.5 hover:text-white" 
+                                            title="Rename Folder"
+                                            onclick={(e) => {
+                                                e.stopPropagation();
+                                                if (editingId === folder.id) {
+                                                    editingId = null;
+                                                } else {
+                                                    editingId = folder.id;
+                                                }
+                                            }}
+                                        >
+                                            <PencilIcon size="12" />
+                                        </button>
+                                         <button 
+                                            class="p-0.5 hover:text-red-400" 
+                                            title="Delete Folder"
+                                            onclick={async (e) => {
+                                                e.stopPropagation();
+                                                if(await alertConfirm(`Delete folder ${folder.name}? Chats inside will be moved to root.`)) {
+                                                    // Move chats to root
+                                                    const chats = DBState.db.characters[$selectedCharID].chats;
+                                                    chats.forEach(c => {
+                                                        if(c.folderId === folder.id) c.folderId = null;
+                                                    });
+                                                    DBState.db.characters[$selectedCharID].chatFolders.splice(i, 1);
+                                                    $ReloadGUIPointer++; 
+                                                }
+                                            }}
+                                        >
+                                            <TrashIcon size="12" />
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {#if !folder.folded}
+                                    <div class="flex flex-col ml-4 border-l border-[#3e3e42]">
+                                        {#each DBState.db.characters[$selectedCharID].chats as chat, k}
+                                            {#if chat.folderId === folder.id}
+                                                 <div 
+                                                    class="flex items-center px-2 py-1 hover:bg-[#2a2d2e] cursor-pointer gap-2 group {DBState.db.characters[$selectedCharID].chatPage === k ? 'bg-[#37373d] text-white' : ''}"
+                                                    onclick={() => {
+                                                        changeChatTo(k);
+                                                        window.dispatchEvent(new CustomEvent('studio-open-chat'));
+                                                    }}
+                                                    role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && changeChatTo(k)}
+                                                >
+                                                     <MessageSquare size="14" class="shrink-0" />
+                                                     {#if editingId === chat.id}
+                                                         <input
+                                                             bind:value={chat.name}
+                                                             class="bg-[#3e3e42] text-white px-1 py-0.5 rounded flex-1 min-w-0 border border-blue-500 focus:outline-none text-xs"
+                                                             autofocus
+                                                             onblur={() => editingId = null}
+                                                             onkeydown={(e) => {
+                                                                 if(e.key === 'Enter') editingId = null;
+                                                                 e.stopPropagation();
+                                                             }}
+                                                             onclick={(e) => e.stopPropagation()}
+                                                         />
+                                                     {:else}
+                                                         <span class="truncate flex-1">{chat.name}</span>
+                                                     {/if}
+                                                     
+                                                     <div class="hidden group-hover:flex items-center gap-1 text-[#cccccc]">
+                                                         <button class="hover:text-white p-0.5" title="Rename" onclick={(e) => {
+                                                             e.stopPropagation();
+                                                             if (editingId === chat.id) {
+                                                                 editingId = null;
+                                                             } else {
+                                                                 editingId = chat.id;
+                                                             }
+                                                         }}>
+                                                             <PencilIcon size="12" />
+                                                         </button>
+                                                         <button class="hover:text-white p-0.5" title="Move" onclick={async (e) => {
+                                                             e.stopPropagation();
+                                                             const validFolders = ["Root", ...(DBState.db.characters[$selectedCharID].chatFolders?.map(f => f.name) || [])];
+                                                             const selection = await alertSelect(validFolders);
+                                                             if(selection){
+                                                                 const idx = parseInt(selection);
+                                                                 if(idx === 0) {
+                                                                     chat.folderId = null;
+                                                                     alertNormal("Moved to Root");
+                                                                 } else {
+                                                                     const targetFolder = DBState.db.characters[$selectedCharID].chatFolders[idx-1];
+                                                                     chat.folderId = targetFolder.id;
+                                                                     alertNormal(`Moved to ${targetFolder.name}`);
+                                                                 }
+                                                                 $ReloadGUIPointer++;
+                                                             }
+                                                         }}>
+                                                             <FolderIcon size="12" />
+                                                         </button>
+                                                         <button class="hover:text-red-400 p-0.5" title="Delete" onclick={async (e) => {
+                                                             e.stopPropagation();
+                                                             if(await alertConfirm(`Delete chat ${chat.name}?`)) {
+                                                                 if(DBState.db.characters[$selectedCharID].chats.length <= 1) {
+                                                                     alertError("Cannot delete the last chat.");
+                                                                     return;
+                                                                 }
+                                                                 changeChatTo(0);
+                                                                 DBState.db.characters[$selectedCharID].chats.splice(k, 1);
+                                                                 $ReloadGUIPointer++;
+                                                             }
+                                                         }}>
+                                                             <TrashIcon size="12" />
+                                                         </button>
+                                                     </div>
+                                                </div>
+                                            {/if}
+                                        {/each}
+                                    </div>
+                                {/if}
+                            </div>
+                        {/each}
+                    {/if}
+
+                    <!-- Root Chats -->
+                     {#each DBState.db.characters[$selectedCharID].chats as chat, i}
+                        {#if !chat.folderId}
+                             <div 
+                                class="flex items-center px-4 py-1 hover:bg-[#2a2d2e] cursor-pointer gap-2 group {DBState.db.characters[$selectedCharID].chatPage === i ? 'bg-[#37373d] text-white' : ''}"
+                                onclick={() => {
+                                    changeChatTo(i);
+                                    window.dispatchEvent(new CustomEvent('studio-open-chat'));
+                                }}
+                                role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && changeChatTo(i)}
+                            >
+                                 <MessageSquare size="14" class="shrink-0" />
+                                 {#if editingId === chat.id}
+                                     <input
+                                         bind:value={chat.name}
+                                         class="bg-[#3e3e42] text-white px-1 py-0.5 rounded flex-1 min-w-0 border border-blue-500 focus:outline-none text-xs"
+                                         autofocus
+                                         onblur={() => editingId = null}
+                                         onkeydown={(e) => {
+                                             if(e.key === 'Enter') editingId = null;
+                                             e.stopPropagation();
+                                         }}
+                                         onclick={(e) => e.stopPropagation()}
+                                     />
+                                 {:else}
+                                     <span class="truncate flex-1">{chat.name}</span>
+                                 {/if}
+                                 
+                                  <div class="hidden group-hover:flex items-center gap-1 text-[#cccccc]">
+                                     <button class="hover:text-white p-0.5" title="Rename" onclick={(e) => {
+                                         e.stopPropagation();
+                                         if (editingId === chat.id) {
+                                             editingId = null;
+                                         } else {
+                                             editingId = chat.id;
+                                         }
+                                     }}>
+                                         <PencilIcon size="12" />
+                                     </button>
+                                     <button class="hover:text-white p-0.5" title="Move" onclick={async (e) => {
+                                         e.stopPropagation();
+                                         const validFolders = ["Root", ...(DBState.db.characters[$selectedCharID].chatFolders?.map(f => f.name) || [])];
+                                         const selection = await alertSelect(validFolders);
+                                         if(selection){
+                                             const idx = parseInt(selection);
+                                             if(idx === 0) {
+                                                 chat.folderId = null;
+                                                 alertNormal("Moved to Root");
+                                             } else {
+                                                 const targetFolder = DBState.db.characters[$selectedCharID].chatFolders[idx-1];
+                                                 chat.folderId = targetFolder.id;
+                                                 alertNormal(`Moved to ${targetFolder.name}`);
+                                             }
+                                             $ReloadGUIPointer++;
+                                         }
+                                     }}>
+                                         <FolderIcon size="12" />
+                                     </button>
+                                     <button class="hover:text-red-400 p-0.5" title="Delete" onclick={async (e) => {
+                                         e.stopPropagation();
+                                         if(await alertConfirm(`Delete chat ${chat.name}?`)) {
+                                             if(DBState.db.characters[$selectedCharID].chats.length <= 1) {
+                                                 alertError("Cannot delete the last chat.");
+                                                 return;
+                                             }
+                                             changeChatTo(0);
+                                             DBState.db.characters[$selectedCharID].chats.splice(i, 1);
+                                             $ReloadGUIPointer++;
+                                         }
+                                     }}>
+                                         <TrashIcon size="12" />
+                                     </button>
+                                 </div>
+                            </div>
+                        {/if}
                     {/each}
                 {:else}
                     <div class="p-4 text-center text-[#858585]">Base Character Not Selected</div>

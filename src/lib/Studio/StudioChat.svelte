@@ -17,7 +17,9 @@
         CameraIcon,
         ImagePlusIcon,
         ReplyIcon,
-        PackageIcon
+        PackageIcon,
+        FolderIcon,
+        BookmarkIcon
     } from "@lucide/svelte";
     import { triggerTypingEffect, playSendSound } from "../../ts/gui/typingEffect";
     import {
@@ -26,7 +28,9 @@
         selectedCharID,
         createSimpleCharacter,
         hypaV3ModalOpen,
-        additionalChatMenu
+        additionalChatMenu,
+        bookmarkListOpen,
+        ReloadGUIPointer
     } from "../../ts/stores.svelte";
     import { ConnectionOpenStore } from "src/ts/sync/multiuser";
     import Chat from "../ChatScreens/Chat.svelte";
@@ -47,7 +51,8 @@
         alertNormal,
         alertConfirm,
         alertRequestData,
-        showHypaV2Alert
+        showHypaV2Alert,
+        alertSelect
     } from "../../ts/alert";
     import sendSound from "../../etc/send.mp3";
     import { processScript } from "src/ts/process/scripts";
@@ -84,20 +89,19 @@
     let { customStyle = "" }: Props = $props();
 
     let currentCharacter = $derived(DBState.db.characters[$selectedCharID]);
-    let currentChat = $derived(
-        currentCharacter?.chats[currentCharacter.chatPage]?.message ?? [],
+    let chatObj = $derived(currentCharacter?.chats?.[currentCharacter.chatPage]);
+    let currentMessages = $derived(
+        chatObj?.message ?? [],
     );
      let hasSuggestions = $derived(
         !$doingChat && 
-        currentCharacter?.chats?.[currentCharacter.chatPage]?.suggestMessages?.length > 0
+        chatObj?.suggestMessages?.length > 0
     );
 
     // Derived User Info
     let { userIconPortrait, currentUsername, userIcon } = $derived.by(() => {
         const bindedPersona =
-            DBState?.db?.characters?.[$selectedCharID]?.chats?.[
-                DBState?.db?.characters?.[$selectedCharID]?.chatPage
-            ]?.bindedPersona;
+            chatObj?.bindedPersona;
 
         if (bindedPersona) {
             const persona = DBState.db.personas.find(
@@ -139,6 +143,27 @@
         }
     });
 
+    async function changeFolder() {
+        if (!currentCharacter) return;
+        const folders = currentCharacter.chatFolders || [];
+        
+        let folderList = ["Root", ...folders.map(f => f.name)];
+        const res = await alertSelect(folderList);
+        if (res !== null) {
+             const idx = parseInt(res);
+             if (idx === 0) {
+                 // Root
+                 chatObj.folderId = null;
+                 alertNormal("Moved to Root");
+             } else {
+                 const folder = folders[idx - 1];
+                 chatObj.folderId = folder.id;
+                 alertNormal(`Moved to ${folder.name}`);
+             }
+             $ReloadGUIPointer++;
+        }
+    }
+
     async function scrollToMessage(index: number) {
         // Since we use Chats component now, simplistic scrolling might be tricky if items are not mounted.
         // Chats.svelte handles scrolling mostly internally or via refs.
@@ -148,7 +173,7 @@
         
         isScrollingToMessage = true;
         try {
-            const totalMessages = currentChat.length;
+            const totalMessages = currentMessages.length;
             const neededLoadPages = totalMessages - index + 5;
 
             if (loadPages < neededLoadPages) {
@@ -509,14 +534,16 @@
              // We'll stick to DefaultChatScreen's logic signature.
              
              // Simple check:
-             if (target.scrollTop < 100 && currentChat.length > loadPages) {
+             if (target.scrollTop < 100 && currentMessages.length > loadPages) {
                 loadPages += 15;
             }
         }}
      >
+
+
           <Chats 
               bind:this={chatsInstance}
-              messages={currentChat}
+              messages={currentMessages}
               currentCharacter={currentCharacter}
               {onReroll}
               {unReroll}
@@ -532,6 +559,7 @@
                     character={createSimpleCharacter(
                         DBState.db.characters[$selectedCharID],
                     )}
+                    isLastMemory={false}
                     name={DBState.db.characters[$selectedCharID].name}
                     message={DBState.db.characters[$selectedCharID]
                         .chats[
@@ -566,7 +594,7 @@
             {/if}
           {/if}
           
-          {#if currentChat.length === 0 && !currentCharacter.firstMessage && (!currentCharacter.alternateGreetings || currentCharacter.alternateGreetings.length === 0)}
+          {#if currentMessages.length === 0 && !currentCharacter.firstMessage && (!currentCharacter.alternateGreetings || currentCharacter.alternateGreetings.length === 0)}
                <div class="h-full flex items-center justify-center text-textcolor2 opacity-50 italic">
                    No messages yet. Start the conversation!
                </div>
