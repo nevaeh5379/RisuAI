@@ -694,6 +694,9 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.studioMode)) {
         data.studioMode = false
     }
+    if (checkNullish(data.studioLayout)) {
+        data.studioLayout = false
+    }
     //@ts-expect-error __TAURI_INTERNALS__ is injected by Tauri runtime, not defined in Window interface
     if (!globalThis.__NODE__ && !window.__TAURI_INTERNALS__) {
         //this is intended to forcely reduce the size of the database in web
@@ -1492,6 +1495,7 @@ export interface character {
     prebuiltAssetStyle?: string
     prebuiltAssetExclude?: string[]
     modules?: string[]
+    studioLayout?: boolean
 }
 
 
@@ -1844,6 +1848,7 @@ export interface Message {
     name?: string
     otherUser?: boolean
     disabled?: false | true | 'allBefore'
+    firstMessage?: boolean
     isComment?: boolean
 }
 

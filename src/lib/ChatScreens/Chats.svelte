@@ -101,6 +101,7 @@
                         name: message.role === 'user' ? currentUsername : currentCharacter.name,
                         isComment: message.isComment ?? false,
                         disabled: message.disabled ?? false,
+                        firstMessage: message.firstMessage ?? false,
                     },
 
                 })

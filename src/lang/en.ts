@@ -677,6 +677,7 @@ export const languageEnglish = {
     jailbreakToggle: "Toggle Jailbreak",
     charIcon: "Character Icon",
     characterDisplay: "Character Display",
+    characterSettings: "Character Settings",
     viewScreen: "Additional Character Screen",
     none: "None",
     emotionImage: "Emotion Images",

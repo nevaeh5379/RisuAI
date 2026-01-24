@@ -1,4 +1,4 @@
-import DOMPurify from 'dompurify';
+﻿import DOMPurify from 'dompurify';
 import markdownit from 'markdown-it'
 import { appVer, getCurrentCharacter, getDatabase, type Database, type character, type customscript, type groupChat, type triggerscript } from './storage/database.svelte';
 import { DBState, selIdState } from './stores.svelte';

@@ -32,8 +32,8 @@
     import StudioMain from './lib/Studio/StudioMain.svelte';
     import { studioModeOpen } from './ts/stores.svelte';
     import ExportModal from './lib/ChatScreens/ExportModal.svelte';
+    import StudioSidebar from './lib/Studio/StudioSidebar.svelte';
 
-  
     let didFirstSetup: boolean  = $derived(DBState.db?.didFirstSetup)
     let gridOpen = $state(false)
     let aprilFools = $state(new Date().getMonth() === 3 && new Date().getDate() === 1)
@@ -170,17 +170,26 @@
             <GridChars endGrid={() => {gridOpen = false}} />
         {:else}
             {#if (!$DynamicGUI)}
-                <Sidebar openGrid={() => {gridOpen = true}} hidden={!$sideBarStore} />
+                {#if DBState.db.studioLayout}
+                    <StudioSidebar />
+                {:else}
+                    <Sidebar openGrid={() => {gridOpen = true}} hidden={!$sideBarStore} />
+                {/if}
             {:else}
                 <div class="top-0 w-full h-full left-0 z-30 flex flex-row items-center" class:fixed={$sideBarStore} class:hidden={!$sideBarStore} >
                     <!-- svelte-ignore a11y_click_events_have_key_events -->
-                    <Sidebar openGrid={() => {gridOpen = true}}  hidden={false} />
-
-
-
+                    {#if DBState.db.studioLayout}
+                        <StudioSidebar />
+                    {:else}
+                        <Sidebar openGrid={() => {gridOpen = true}}  hidden={false} />
+                    {/if}
                 </div>
             {/if}
-            <ChatScreen />
+            {#if $studioModeOpen || DBState.db.studioLayout}
+                <StudioMain />
+            {:else}
+                <ChatScreen />
+            {/if}
         {/if}
     {/if}
     {#if $alertStore.type !== 'none'}
@@ -212,8 +221,6 @@
     {#if popupStore.children}
         <PopupList />
     {/if}
-    {#if $studioModeOpen}
-        <StudioMain />
-    {/if}
+
     <ExportModal />
 </main>
