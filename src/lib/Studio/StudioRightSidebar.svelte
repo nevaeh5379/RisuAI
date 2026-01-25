@@ -12,6 +12,7 @@
     import Help from "../Others/Help.svelte";
     import { language } from "src/lang";
     import StudioBotSettings from "./StudioBotSettings.svelte";
+    import { fly } from "svelte/transition";
 
     let char = $derived(DBState.db.characters[$selectedCharID] as character);
 
@@ -79,10 +80,15 @@
     <div 
         class="fixed inset-0 bg-black/50 z-40 transition-opacity duration-300"
         onclick={onClose}
+        transition:fly={{ duration: 200, opacity: 0 }}
     ></div>
 {/if}
 
-<div class="{isMobile ? 'fixed inset-y-0 right-0 z-50 border-l border-[#3e3e42]' : 'border-l border-[#3e3e42] shadow-xl'} {isMobile ? 'w-full' : 'w-80'} h-full bg-[#252526] flex flex-col shadow-xl">
+<div 
+    class="{isMobile ? 'fixed inset-y-0 right-0 z-50 border-l border-[#3e3e42]' : 'border-l border-[#3e3e42] shadow-xl'} {isMobile ? 'w-full' : 'w-80'} h-full bg-[#252526] flex flex-col shadow-xl"
+    transition:fly={{ x: 300, duration: 300 }}
+>
+
     <div class="px-4 py-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center bg-[#252526] h-9 shrink-0 border-b border-[#3e3e42] text-[#cccccc]">
         <div class="flex gap-2 items-center">
              <button 

@@ -5,6 +5,7 @@ export interface StudioTab {
     key: string;
     title: string;
     icon?: any;
+    data?: any;
 }
 
 export interface FloatingWindowData {
@@ -24,7 +25,7 @@ export const StudioState = $state({
     globalZIndex: 100,
 });
 
-export function openStudioTab(key: string, title: string, icon?: any) {
+export function openStudioTab(key: string, title: string, icon?: any, data?: any) {
     // Check if already in floating windows
     const fw = StudioState.floatingWindows.find(w => w.tab.key === key);
     if (fw) {
@@ -36,6 +37,7 @@ export function openStudioTab(key: string, title: string, icon?: any) {
     const existingTab = StudioState.tabs.find(t => t.key === key);
     if (existingTab) {
         StudioState.activeTabId = existingTab.id;
+        // Optionally update data if needed, but key usually implies uniqueness
         return;
     }
 
@@ -44,7 +46,8 @@ export function openStudioTab(key: string, title: string, icon?: any) {
         id: v4(),
         key,
         title,
-        icon
+        icon,
+        data
     };
     StudioState.tabs.push(newTab);
     StudioState.activeTabId = newTab.id;

@@ -42,6 +42,7 @@
   import { alertInput, alertSelect, alertNormal, alertConfirm, alertError } from "src/ts/alert";
   import { Pencil as PencilIcon, Trash2 as TrashIcon, MoreHorizontal as MenuIcon, Download as DownloadIcon } from "@lucide/svelte";
   import { ReloadGUIPointer } from "src/ts/stores.svelte";
+  import { openStudioTab } from "./studioStore.svelte";
 
   let charImages: any[] = $state([]);
   let openFolders:string[] = $state([])
@@ -60,9 +61,6 @@
       window.addEventListener('resize', checkMobile);
       return () => window.removeEventListener('resize', checkMobile);
   }); 
-  // 'characters' is default as requested "Bot list separated"
-
-  // let currentDrag: DragData = $state(null)
 
   function reseter() {
     settingsOpen.set(false);
@@ -74,9 +72,9 @@
         let newCharImages: any[] = [];
         const idObject = getCharacterIndexObject()
         for (const id of DBState.db.characterOrder) {
-          if(typeof(id) === 'string'){
+          if(typeof(id) === 'string') {
             const index = idObject[id] ?? -1
-            if(index !== -1){
+            if(index !== -1) {
               const cha = DBState.db.characters[index]
               newCharImages.push({
                 img: await getCharImage(cha.image ?? "", "plain"),
@@ -86,12 +84,12 @@
               });
             }
           }
-          else{
+          else {
             const folder = id
             let folderCharImages: any[] = []
-            for(const id of folder.data){
+            for(const id of folder.data) {
               const index = idObject[id] ?? -1
-              if(index !== -1){
+              if(index !== -1) {
                 const cha = DBState.db.characters[index]
                 folderCharImages.push({
                   img: await getCharImage(cha.image ?? "", "plain"),
@@ -127,12 +125,12 @@
 
   function onSelectChar(index: number) {
       changeChar(index, {reseter});
-      // Switch to chats tab automatically when character selected?
-      // User might prefer staying on list. Let's keep it manual or auto?
-      // User said "Chat list separated". Maybe switch?
-      // Let's stick to manual tab switching for now to avoid confusion.
       activeSidebarTab = 'chats'; 
-      window.dispatchEvent(new CustomEvent('studio-open-chat'));
+      // Open tab for current chat of selected char
+      const char = DBState.db.characters[index];
+      const chatIndex = char.chatPage;
+      const chatName = char.chats[chatIndex]?.name ?? "Chat";
+      openStudioTab(`chat:${index}:${chatIndex}`, chatName, MessageSquare, { charId: index, chatIndex: chatIndex });
   }
 
   function createNewChat() {
@@ -153,14 +151,14 @@
           DBState.db.characters[$selectedCharID].chats = [];
       }
       
-      // Push new chat to the beginning or end? Usually beginning (unshift) for "Newest first"?
-      // Or end? RisuAI usually appends.
       DBState.db.characters[$selectedCharID].chats.unshift(newChat);
       
       // Switch to this new chat
       changeChatTo(0);
-      window.dispatchEvent(new CustomEvent('studio-open-chat'));
+      const charName = DBState.db.characters[$selectedCharID].name;
+      openStudioTab(`chat:${$selectedCharID}:0`, "New Chat", MessageSquare, { charId: $selectedCharID, chatIndex: 0 });
   }
+
 
   function createNewFolder() {
       if ($selectedCharID === -1) return;
@@ -411,7 +409,7 @@
                                                     class="flex items-center px-2 py-1 hover:bg-[#2a2d2e] cursor-pointer gap-2 group {DBState.db.characters[$selectedCharID].chatPage === k ? 'bg-[#37373d] text-white' : ''}"
                                                     onclick={() => {
                                                         changeChatTo(k);
-                                                        window.dispatchEvent(new CustomEvent('studio-open-chat'));
+                                                        openStudioTab(`chat:${$selectedCharID}:${k}`, chat.name, MessageSquare, { charId: $selectedCharID, chatIndex: k });
                                                     }}
                                                     role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && changeChatTo(k)}
                                                 >
@@ -493,7 +491,7 @@
                                 class="flex items-center px-4 py-1 hover:bg-[#2a2d2e] cursor-pointer gap-2 group {DBState.db.characters[$selectedCharID].chatPage === i ? 'bg-[#37373d] text-white' : ''}"
                                 onclick={() => {
                                     changeChatTo(i);
-                                    window.dispatchEvent(new CustomEvent('studio-open-chat'));
+                                    openStudioTab(`chat:${$selectedCharID}:${i}`, chat.name, MessageSquare, { charId: $selectedCharID, chatIndex: i });
                                 }}
                                 role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && changeChatTo(i)}
                             >

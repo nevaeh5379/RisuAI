@@ -36,23 +36,38 @@
         return () => window.removeEventListener('resize', checkMobile);
     });
 
-    // Initialize with Chat and Settings
+    // Initialize with Chat
     $effect(() => {
         if (StudioState.tabs.length === 0 && StudioState.floatingWindows.length === 0 && char) {
-            openStudioTab('chat', 'Chat', MessageSquareIcon);
-            openStudioTab('basic:all', 'Character Settings', Settings);
+             // We don't force open chat anymore, let user open from sidebar?
+             // Or keep default behavior to open chat if nothing open?
+             // User said "Start empty or dashboard". "Dashboard when no tabs".
+             // So remove auto-open.
+        }
+    });
+
+    // Sync Global State with Active Tab
+    $effect(() => {
+        const activeTab = StudioState.tabs.find(t => t.id === StudioState.activeTabId);
+        if (activeTab && activeTab.data?.charId !== undefined) {
+             if ($selectedCharID !== activeTab.data.charId) {
+                 $selectedCharID = activeTab.data.charId;
+             }
+             if (activeTab.data.chatIndex !== undefined) {
+                 const c = DBState.db.characters[activeTab.data.charId];
+                 if (c && c.chatPage !== activeTab.data.chatIndex) {
+                     c.chatPage = activeTab.data.chatIndex;
+                 }
+             }
         }
     });
 
     $effect(() => {
         if (typeof window !== 'undefined') {
             const handleOpenChat = () => {
-                const chatTab = StudioState.tabs.find(t => t.key === 'chat');
-                if (chatTab) {
-                    StudioState.activeTabId = chatTab.id;
-                } else {
-                    openStudioTab('chat', 'Chat', MessageSquareIcon);
-                }
+                // Legacy listener, maybe remove or adapt?
+                // For now, if triggered, try to find a chat tab or do nothing
+                // StudioSidebar handles specifics now.
             };
             window.addEventListener('studio-open-chat', handleOpenChat);
             return () => {
@@ -65,37 +80,42 @@
 
 <!-- Main Studio Layout (VSCode Style) -->
 {#if char}
-    <div class="flex w-full bg-[#1e1e1e] text-[#cccccc] font-sans overflow-hidden {isMobile ? 'h-[100dvh]' : 'h-full'}">
+    <div class="flex w-full bg-[#1e1e1e] text-[#cccccc] font-sans overflow-hidden {isMobile ? 'h-dvh' : 'h-full'}">
         
         <!-- Center Content Area with Tabs -->
         <div class="flex-1 flex flex-col min-w-0 bg-[#1e1e1e]">
             {#if tabs.length > 0}
                 <!-- Tab Bar -->
-                <div class="flex bg-[#252526] border-b border-[#3e3e42] overflow-x-auto n-scroll shrink-0 h-9 items-end {isMobile ? 'pl-12' : ''}">
-                    {#each tabs as tab (tab.id)}
-                        <div 
-                            class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none max-w-48 group shrink-0 border-r border-[#3e3e42] h-full relative {activeTabId === tab.id ? 'bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]' : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e]'}"
-                            onclick={() => StudioState.activeTabId = tab.id}
-                            role="button" tabindex="0"
-                            onkeydown={(e) => e.key === 'Enter' && (StudioState.activeTabId = tab.id)}
-                        >
-                            {#if tab.icon}
-                                <tab.icon size="14" class="shrink-0 {activeTabId === tab.id ? 'text-[#007acc]' : ''}" />
-                            {/if}
-                            <span class="truncate text-xs">{tab.title}</span>
-                            <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
-                                 <button class="p-0.5 hover:text-white hover:bg-[#4a4a4a] rounded-sm" title="Pop out" onclick={(e) => { e.stopPropagation(); popOutStudioTab(tab.id); }}>
-                                    <ExternalLinkIcon size="12" />
-                                </button>
-                                <button class="p-0.5 hover:text-white hover:bg-[#4a4a4a] rounded-sm" title="Close" onclick={(e) => { e.stopPropagation(); closeStudioTab(tab.id); }}>
-                                    <XIcon size="12" />
-                                </button>
+                <div class="flex bg-[#252526] border-b border-[#3e3e42] h-9 items-end shrink-0 {isMobile ? 'pl-12' : ''}">
+                    <!-- Tabs Scroll Area -->
+                    <div class="flex-1 flex overflow-x-auto n-scroll h-full items-end">
+                        {#each tabs as tab (tab.id)}
+                            <div 
+                                class="flex items-center gap-2 px-3 py-1.5 cursor-pointer select-none max-w-48 group shrink-0 border-r border-[#3e3e42] h-full relative {activeTabId === tab.id ? 'bg-[#1e1e1e] text-white border-t-2 border-t-[#007acc]' : 'bg-[#2d2d2d] text-[#969696] hover:bg-[#2a2d2e]'}"
+                                onclick={() => StudioState.activeTabId = tab.id}
+                                role="button" tabindex="0"
+                                onkeydown={(e) => e.key === 'Enter' && (StudioState.activeTabId = tab.id)}
+                            >
+                                {#if tab.icon}
+                                    <tab.icon size="14" class="shrink-0 {activeTabId === tab.id ? 'text-[#007acc]' : ''}" />
+                                {/if}
+                                <span class="truncate text-xs">{tab.title}</span>
+                                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                                    <button class="p-0.5 hover:text-white hover:bg-[#4a4a4a] rounded-sm" title="Pop out" onclick={(e) => { e.stopPropagation(); popOutStudioTab(tab.id); }}>
+                                        <ExternalLinkIcon size="12" />
+                                    </button>
+                                    <button class="p-0.5 hover:text-white hover:bg-[#4a4a4a] rounded-sm" title="Close" onclick={(e) => { e.stopPropagation(); closeStudioTab(tab.id); }}>
+                                        <XIcon size="12" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    {/each}
-                    <div class="grow h-full border-b border-[#3e3e42]"></div>
+                        {/each}
+                        <div class="grow h-full border-b border-[#3e3e42] min-w-[20px]"></div>
+                    </div>
+
+                    <!-- Right Sidebar Toggle (Fixed) -->
                     <button 
-                        class="px-3 h-full flex items-center justify-center hover:bg-[#3e3e42] text-[#cccccc] border-b border-[#3e3e42] {rightSidebarOpen ? 'bg-[#3e3e42] text-white' : ''}" 
+                        class="px-3 h-full flex items-center justify-center hover:bg-[#3e3e42] text-[#cccccc] border-b border-[#3e3e42] shrink-0 {rightSidebarOpen ? 'bg-[#3e3e42] text-white' : ''}" 
                         onclick={() => rightSidebarOpen = !rightSidebarOpen}
                         title="Toggle Right Sidebar"
                     >
@@ -107,10 +127,10 @@
                 <div class="flex-1 overflow-hidden relative">
                      {#each tabs as tab (tab.id)}
                         <div class="absolute inset-0 w-full h-full {activeTabId === tab.id ? 'block' : 'hidden'}">
-                            {#if tab.key === 'chat'}
+                            {#if tab.key.startsWith('chat')}
                                 <div class="w-full h-full bg-bgcolor relative">
                                      <BackgroundDom />
-                                     <StudioChat />
+                                     <StudioChat charId={tab.data?.charId} chatIndex={tab.data?.chatIndex} />
                                 </div>
                             {:else}
                                 <StudioContent 
@@ -123,23 +143,7 @@
                      {/each}
                 </div>
             {:else}
-                <div class="flex-1 flex justify-center items-center text-[#5a5a5a] flex-col gap-4">
-                    <div class="w-32 h-32 opacity-20 bg-no-repeat bg-center bg-contain" style="background-image: url('logo.png'); /* Placeholder if needed */">
-                         <MenuIcon size="64" />
-                    </div>
-                    <span class="text-sm">Select a file from the explorer to edit</span>
-                    
-                    <div class="flex flex-col gap-2 mt-4 text-xs">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[#858585]">Show All Commands</span>
-                            <span class="bg-[#333] px-1.5 py-0.5 rounded text-[#ccc]">Ctrl+Shift+P</span>
-                        </div>
-                         <div class="flex items-center gap-2">
-                            <span class="text-[#858585]">Go to File</span>
-                            <span class="bg-[#333] px-1.5 py-0.5 rounded text-[#ccc]">Ctrl+P</span>
-                        </div>
-                    </div>
-                </div>
+                 <StudioDashboard />
             {/if}
         </div>
 

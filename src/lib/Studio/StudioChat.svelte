@@ -42,6 +42,7 @@
         sendChat,
     } from "../../ts/process/index.svelte";
     import { sleep, capitalize } from "../../ts/util";
+    import { isMobile } from "../../ts/platform";
     import { untrack, tick } from "svelte";
     import { language } from "../../lang";
     import { isExpTranslator, translate } from "../../ts/translator/translator";
@@ -85,11 +86,19 @@
     // Props
     interface Props {
         customStyle?: string;
+        charId?: number;
+        chatIndex?: number;
     }
-    let { customStyle = "" }: Props = $props();
+    let { customStyle = "", charId = -1, chatIndex = -1 }: Props = $props();
 
-    let currentCharacter = $derived(DBState.db.characters[$selectedCharID]);
-    let chatObj = $derived(currentCharacter?.chats?.[currentCharacter.chatPage]);
+    let targetCharId = $derived(charId !== -1 ? charId : $selectedCharID);
+    let currentCharacter = $derived(DBState.db.characters[targetCharId]);
+    
+    let chatObj = $derived.by(() => {
+        if(!currentCharacter) return null;
+        if(chatIndex !== -1 && currentCharacter.chats?.[chatIndex]) return currentCharacter.chats[chatIndex];
+        return currentCharacter?.chats?.[currentCharacter.chatPage];
+    });
     let currentMessages = $derived(
         chatObj?.message ?? [],
     );
@@ -214,11 +223,11 @@
             autoMode = false;
             return;
         }
-        const selectedChar = $selectedCharID;
+        const selectedChar = targetCharId;
         autoMode = true;
         while (autoMode) {
             await sendChatMain();
-            if (selectedChar !== $selectedCharID) {
+            if (selectedChar !== targetCharId) {
                 autoMode = false;
             }
         }
@@ -298,15 +307,15 @@
             playSendSound();
         }
         
-        let selectedChar = $selectedCharID;
+        let selectedChar = targetCharId;
         if ($doingChat) return;
 
-        if (lastCharId !== $selectedCharID) {
+        if (lastCharId !== targetCharId) {
             rerolls = [];
             rerollid = -1;
         }
 
-        let cha = DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message;
+        let cha = currentCharacter.chats[currentCharacter.chatPage].message;
 
         if (messageInput.startsWith("/")) {
             const commandProcessed = await processMultiCommand(messageInput);
@@ -324,7 +333,7 @@
         }
 
         if (messageInput === "") {
-             if (DBState.db.characters[selectedChar].type !== "group") {
+             if (currentCharacter.type !== "group") {
                 if (cha.length === 0 || cha[cha.length - 1].role !== "user") {
                     if (DBState.db.useSayNothing) {
                          cha.push({
@@ -336,7 +345,7 @@
                 }
             }
         } else {
-             const char = DBState.db.characters[selectedChar];
+             const char = currentCharacter;
             if (char.type === "character") {
                 const triggerResult = await runTrigger(char, "input", { chat: char.chats[char.chatPage] });
                 if (triggerResult) cha = triggerResult.chat.message;
@@ -348,7 +357,7 @@
         
         messageInput = "";
         messageInputTranslate = "";
-        DBState.db.characters[selectedChar].chats[DBState.db.characters[selectedChar].chatPage].message = cha;
+        currentCharacter.chats[currentCharacter.chatPage].message = cha;
         rerolls = [];
         await sleep(10);
         updateInputSizeAll();
@@ -359,15 +368,15 @@
     // Reroll Logic (Copied/Adapted from DefaultChatScreen)
     async function onReroll() {
         if ($doingChat) return;
-        if (lastCharId !== $selectedCharID) {
+        if (lastCharId !== targetCharId) {
             rerolls = [];
             rerollid = -1;
         }
-        const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId;
+        const genId = currentCharacter.chats[currentCharacter.chatPage].message.at(-1)?.generationInfo?.generationId;
         if (genId) {
             const r = Prereroll(genId);
             if (r) {
-                DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length - 1].data = r;
+                currentCharacter.chats[currentCharacter.chatPage].message[currentCharacter.chats[currentCharacter.chatPage].message.length - 1].data = r;
                 return;
             }
         }
@@ -375,19 +384,19 @@
             if (Array.isArray(rerolls[rerollid + 1])) {
                 rerollid += 1;
                 let rerollData = safeStructuredClone(rerolls[rerollid]);
-                let msgs = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message;
+                let msgs = currentCharacter.chats[currentCharacter.chatPage].message;
                 for (let i = 0; i < rerollData.length; i++) {
                     msgs[msgs.length - rerollData.length + i] = rerollData[i];
                 }
-                DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message = msgs;
+                currentCharacter.chats[currentCharacter.chatPage].message = msgs;
             }
             return;
         }
         if (rerolls.length === 0) {
-            rerolls.push(safeStructuredClone([DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)]));
+            rerolls.push(safeStructuredClone([currentCharacter.chats[currentCharacter.chatPage].message.at(-1)]));
             rerollid = rerolls.length - 1;
         }
-        let cha = safeStructuredClone(DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message);
+        let cha = safeStructuredClone(currentCharacter.chats[currentCharacter.chatPage].message);
         if (cha.length === 0) return;
         
         const saying = cha[cha.length - 1].saying;
@@ -400,21 +409,21 @@
             let msg = cha.pop();
             if (!msg) return;
         }
-        DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message = cha;
+        currentCharacter.chats[currentCharacter.chatPage].message = cha;
         await sendChatMain();
     }
 
     async function unReroll() {
         if ($doingChat) return;
-        if (lastCharId !== $selectedCharID) {
+        if (lastCharId !== targetCharId) {
             rerolls = [];
             rerollid = -1;
         }
-        const genId = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.at(-1)?.generationInfo?.generationId;
+        const genId = currentCharacter.chats[currentCharacter.chatPage].message.at(-1)?.generationInfo?.generationId;
         if (genId) {
              const r = PreUnreroll(genId);
             if (r) {
-                DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message[DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length - 1].data = r;
+                currentCharacter.chats[currentCharacter.chatPage].message[currentCharacter.chats[currentCharacter.chatPage].message.length - 1].data = r;
                 return;
             }
         }
@@ -422,30 +431,30 @@
         if (Array.isArray(rerolls[rerollid - 1])) {
             rerollid -= 1;
             let rerollData = safeStructuredClone(rerolls[rerollid]);
-            let msgs = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message;
+            let msgs = currentCharacter.chats[currentCharacter.chatPage].message;
             for (let i = 0; i < rerollData.length; i++) {
                 msgs[msgs.length - rerollData.length + i] = rerollData[i];
             }
-            DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message = msgs;
+            currentCharacter.chats[currentCharacter.chatPage].message = msgs;
         }
     }
 
     let abortController: null | AbortController = null;
 
     async function sendChatMain(continued: boolean = false) {
-        let previousLength = DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length;
+        let previousLength = currentCharacter.chats[currentCharacter.chatPage].message.length;
         abortController = new AbortController();
         try {
-            await sendChat(-1, { signal: abortController.signal, continue: continued });
-             if (previousLength < DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length) {
-                rerolls.push(safeStructuredClone(DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message).slice(previousLength));
+            await sendChat(targetCharId, { signal: abortController.signal, continue: continued });
+             if (previousLength < currentCharacter.chats[currentCharacter.chatPage].message.length) {
+                rerolls.push(safeStructuredClone(currentCharacter.chats[currentCharacter.chatPage].message).slice(previousLength));
                 rerollid = rerolls.length - 1;
             }
         } catch (error) {
             console.error(error);
             alertError(error);
         }
-        lastCharId = $selectedCharID;
+        lastCharId = targetCharId;
         $doingChat = false;
          if (DBState.db.playMessage) {
             const audio = new Audio(sendSound);
@@ -506,14 +515,14 @@
     // Simplified effect: Only trigger external updates if needed, do NOT push first message to array
     // The first message will be rendered separately as a virtual message, matching DefaultChatScreen behavior.
     $effect(() => {
-        if ($selectedCharID !== -1 && currentCharacter) {
+        if (targetCharId !== -1 && currentCharacter) {
              // Logic to ensure UI stays updated or helper scripts run could go here
              // For now, we trust the reactive binding of currentCharacter and currentChat
         }
     });
 </script>
 
-{#if $selectedCharID >= 0 && currentCharacter}
+{#if targetCharId >= 0 && currentCharacter}
 <div class="flex flex-col h-full w-full bg-[#1e1e1e] text-[#cccccc] relative" style="--risu-theme-bgcolor: #1e1e1e; --risu-theme-textcolor: #cccccc; --risu-theme-darkbg: #252526; --risu-theme-darkborderc: #3e3e42;">
      <!-- Messages Area (Using Chats Component) -->
      <div 
@@ -538,7 +547,7 @@
                 loadPages += 15;
             }
         }}
-     >
+    >
 
 
           <Chats 
@@ -553,39 +562,37 @@
               {userIconPortrait}
           />
           
-          {#if DBState.db.characters[$selectedCharID].chats[DBState.db.characters[$selectedCharID].chatPage].message.length <= loadPages}
-            {#if DBState.db.characters[$selectedCharID].type !== "group"}
+          {#if currentCharacter.chats[currentCharacter.chatPage].message.length <= loadPages}
+            {#if currentCharacter.type !== "group"}
                 <Chat
                     character={createSimpleCharacter(
-                        DBState.db.characters[$selectedCharID],
+                        currentCharacter,
                     )}
                     isLastMemory={false}
-                    name={DBState.db.characters[$selectedCharID].name}
-                    message={DBState.db.characters[$selectedCharID]
+                    name={currentCharacter.name}
+                    message={currentCharacter
                         .chats[
-                        DBState.db.characters[$selectedCharID].chatPage
+                        currentCharacter.chatPage
                     ].fmIndex === -1
-                        ? DBState.db.characters[$selectedCharID]
+                        ? currentCharacter
                               .firstMessage
-                        : DBState.db.characters[$selectedCharID]
+                        : currentCharacter
                               .alternateGreetings[
-                              DBState.db.characters[$selectedCharID]
+                              currentCharacter
                                   .chats[
-                                  DBState.db.characters[$selectedCharID]
+                                  currentCharacter
                                       .chatPage
                               ].fmIndex
                           ]}
                     role="char"
                     img={getCharImage(
-                        DBState.db.characters[$selectedCharID].image,
+                        currentCharacter.image,
                         "css",
                     )}
                     idx={-1}
-                    altGreeting={DBState.db.characters[$selectedCharID]
+                    altGreeting={currentCharacter
                         .alternateGreetings.length > 0}
-                    largePortrait={DBState.db.characters[
-                        $selectedCharID
-                    ].largePortrait}
+                    largePortrait={currentCharacter.largePortrait}
                     firstMessage={true}
                     onReroll={() => {
                         // Reroll logic for first message if needed
@@ -620,7 +627,7 @@
                         role="button" tabindex="0" onkeydown={(e) => { if(e.key === 'Escape') openMenu = false; }}
                         transition:fade={{ duration: 100 }}
                     >
-                        {#if DBState.db.characters[$selectedCharID].type === "group"}
+                        {#if currentCharacter.type === "group"}
                             <div
                                 class="flex items-center cursor-pointer hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10"
                                 onclick={runAutoMode}
@@ -631,7 +638,7 @@
                             </div>
                         {/if}
 
-                        {#if DBState.db.characters[$selectedCharID].ttsMode === "webspeech" || DBState.db.characters[$selectedCharID].ttsMode === "elevenlab"}
+                        {#if currentCharacter.ttsMode === "webspeech" || currentCharacter.ttsMode === "elevenlab"}
                             <div
                                 class="flex items-center cursor-pointer hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10"
                                 onclick={() => {
@@ -749,8 +756,8 @@
                         <div
                             class="flex items-center cursor-pointer hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10"
                             onclick={() => {
-                                DBState.db.characters[$selectedCharID].chats[
-                                    DBState.db.characters[$selectedCharID].chatPage
+                                currentCharacter.chats[
+                                    currentCharacter.chatPage
                                 ].modules ??= [];
                                 alertNormal("Module List not fully supported in Studio mode yet.");
                                 openMenu = false;
@@ -815,7 +822,7 @@
                                 rows="1"
                                 oninput={() => { updateInputSize(); updateInputTransateMessage(false); }}
                                 onkeydown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
+                                    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
                                         e.preventDefault();
                                         if($doingChat) abortChat();
                                         else send();
