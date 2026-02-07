@@ -9,6 +9,7 @@ import { relaunch } from "@tauri-apps/plugin-process";
 import { sleep } from "../util";
 import { hubURL } from "../characterCards";
 import { language } from "src/lang";
+import { NodeStorage } from "../storage/nodeStorage";
 
 function getBasename(data:string){
     const baseNameRegex = /\\/g
@@ -122,11 +123,21 @@ export async function SaveLocalBackupFast(){
     }
     else{
         const keys = await forageStorage.keys()
-        const BATCH_SIZE = 50;
+        const BATCH_SIZE = 0x200;
 
         for (let i = 0; i < keys.length; i += BATCH_SIZE) {
             const batch = keys.slice(i, i + BATCH_SIZE);
-            const readPromises = batch.map(async (key) => {
+            if (forageStorage.realStorage instanceof NodeStorage) {
+                await forageStorage.realStorage.streamAssets(batch, (name, file) => {
+                    if (file) {
+                         writer.writeBackup(name, file)
+                    } else {
+                        missingAssets.push(name)
+                    }
+                })
+            }
+            else {
+const readPromises = batch.map(async (key) => {
                 if (!key) {
                     return null;
                 }
@@ -161,16 +172,16 @@ export async function SaveLocalBackupFast(){
                     missingAssets.push(res.key);
                 }
             }
-
-            let message = `Saving local Backup... (${Math.min(i + BATCH_SIZE, keys.length)} / ${keys.length})`;
-            if (missingAssets.length > 0) {
-                const skippedItems = missingAssets.map(key => {
-                    const assetInfo = assetMap.get(key);
-                    return assetInfo ? `'${assetInfo.assetName}' from ${assetInfo.charName}` : `'${key}'`;
-                }).join(', ');
-                message += `\n(Skipping... ${skippedItems})`;
-            }
-            alertWait(message);
+        }
+        let message = `Saving local Backup... (${Math.min(i + BATCH_SIZE, keys.length)} / ${keys.length})`;
+        if (missingAssets.length > 0) {
+            const skippedItems = missingAssets.map(key => {
+                const assetInfo = assetMap.get(key);
+                return assetInfo ? `'${assetInfo.assetName}' from ${assetInfo.charName}` : `'${key}'`;
+            }).join(', ');
+            message += `\n(Skipping... ${skippedItems})`;
+        }
+        alertWait(message);
         }
     }
 

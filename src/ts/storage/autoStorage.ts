@@ -95,6 +95,8 @@ export class AutoStorage{
         }
     }
 
+    
+
     async checkAccountSync(){
         let db = getDatabase()
         if(this.isAccount){

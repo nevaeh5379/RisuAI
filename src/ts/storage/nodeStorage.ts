@@ -1,6 +1,5 @@
 import { language } from "src/lang"
 import { alertInput } from "../alert"
-
 let auth:string = null
 let authChecked = false
 
@@ -112,6 +111,118 @@ export class NodeStorage{
         }
     }
 
+   async streamAssets(filePaths: string[], onFile:(name: string, file: Uint8Array) => void ) {
+    await this.checkAuth()
+    const da = await fetch('/api/assets/stream', {
+        method: 'POST',
+        headers: {
+            'risu-auth': auth,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(filePaths)
+    })
+
+    if (da.status < 200 || da.status >= 300) {
+        throw new Error("streamAssets Error")
+    }
+
+    const totalFiles = parseInt(da.headers.get('X-File-Count') || '0');
+    const reader = da.body!.getReader();
+    let receivedBuffer = Buffer.alloc(0);
+    let filesProcessed = 0;
+    const files = [];
+    const globalHashData: Buffer[] = []; // 전역 해시용 데이터 모으기
+    let fileCount: number | null = null;
+
+    while (true) {
+        const {done, value} = await reader.read();
+
+        if (value) {
+            receivedBuffer = Buffer.concat([receivedBuffer, Buffer.from(value)]);
+        }
+
+        if (fileCount === null && receivedBuffer.length >= 4) {
+            fileCount = receivedBuffer.readUInt32LE(0);
+            globalHashData.push(receivedBuffer.subarray(0, 4));
+            receivedBuffer = receivedBuffer.subarray(4);
+        }
+
+        while (fileCount !== null && filesProcessed < fileCount) {
+            if (receivedBuffer.length < 4) break;
+
+            const filenameLen = receivedBuffer.readUInt32LE(0);
+            
+            if (receivedBuffer.length < 4 + filenameLen) break;
+            
+            const contentLen = receivedBuffer.readUInt32LE(4 + filenameLen);
+            const totalNeeded = 4 + filenameLen + 4 + contentLen + 32;
+            
+            if (receivedBuffer.length < totalNeeded) break;
+
+            let pos = 0;
+            
+            const filenameLenBuf = receivedBuffer.subarray(pos, pos + 4);
+            pos += 4;
+            globalHashData.push(filenameLenBuf);
+
+            const filename = receivedBuffer.toString('utf8', pos, pos + filenameLen);
+            globalHashData.push(receivedBuffer.subarray(pos, pos + filenameLen));
+            pos += filenameLen;
+
+            const contentLenBuf = receivedBuffer.subarray(pos, pos + 4);
+            pos += 4;
+            globalHashData.push(contentLenBuf);
+
+            const content = receivedBuffer.subarray(pos, pos + contentLen);
+            globalHashData.push(content);
+            pos += contentLen;
+
+            const receivedHash = receivedBuffer.subarray(pos, pos + 32);
+            globalHashData.push(receivedHash);
+            pos += 32;
+
+            // 파일 무결성 검증 (crypto.subtle 사용)
+            console.log(`[Debug] Verifying file: ${filename}, content length: ${content?.length}, contentLen: ${contentLen}`);
+            if (!content || content.length === 0) {
+                console.error(`[Error] Content is empty or undefined for file: ${filename}`);
+                throw new Error(`Content is empty for file: ${filename}`);
+            }
+            const calculatedHashBuf = await globalThis.crypto.subtle.digest('SHA-256', content);
+            const calculatedHash = Buffer.from(calculatedHashBuf);
+            
+            if (!receivedHash.equals(calculatedHash)) {
+                throw new Error(`파일 ${filename} 무결성 검증 실패`);
+            }
+
+            files.push({ filename, content, size: contentLen });
+            filesProcessed++;
+
+            if (onFile) {
+                onFile(filename, content);
+            }
+
+            receivedBuffer = receivedBuffer.subarray(pos);
+        }
+
+        if (done) {
+            if (receivedBuffer.length === 32) {
+                const receivedTotalHash = receivedBuffer;
+                
+                // 전체 데이터 합쳐서 해시 계산
+                const allData = Buffer.concat(globalHashData);
+                const calculatedTotalBuf = await globalThis.crypto.subtle.digest('SHA-256', allData);
+                const calculatedTotalHash = Buffer.from(calculatedTotalBuf);
+                
+                if (!receivedTotalHash.equals(calculatedTotalHash)) {
+                    throw new Error('전체 데이터 무결성 검증 실패');
+                }
+            }
+            break;
+        }
+    }
+    
+    return files;
+}
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()
         const da = await fetch('/api/read', {

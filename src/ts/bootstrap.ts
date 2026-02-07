@@ -494,13 +494,7 @@ async function pargeChunks() {
         //     }
         // }
         const assets = indexes.filter((asset) => asset.startsWith('assets/') && !unpargeable.has(getBasename(asset)))
-        if (forageStorage instanceof NodeStorage) {
-            await forageStorage.removeItemBatch(assets)
-        } else {
-            for (const asset of assets) {
-                await forageStorage.removeItem(asset)
-            }
-        }
+        await forageStorage.removeItemBatch(assets)
     }
 }
 
