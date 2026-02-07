@@ -45,6 +45,7 @@ import {
 } from "./globalApi.svelte";
 import { startTimeTracking } from "./process/statistics";
 import { isTauri, isTauriMobile, isNodeServer } from "./platform";
+import { NodeStorage } from "./storage/nodeStorage";
 
 const appWindow = isTauri ? getCurrentWebviewWindow() : null
 
@@ -481,14 +482,22 @@ async function pargeChunks() {
     }
     else {
         const indexes = await forageStorage.keys()
-        for (const asset of indexes) {
-            if (!asset.startsWith('assets/')) {
-                continue
-            }
-            const n = getBasename(asset)
-            if (unpargeable.has(n)) {
-            }
-            else {
+        // for (const asset of indexes) {
+        //     if (!asset.startsWith('assets/')) {
+        //         continue
+        //     }
+        //     const n = getBasename(asset)
+        //     if (unpargeable.has(n)) {
+        //     }
+        //     else {
+        //         await forageStorage.removeItem(asset)
+        //     }
+        // }
+        const assets = indexes.filter((asset) => asset.startsWith('assets/') && !unpargeable.has(getBasename(asset)))
+        if (forageStorage instanceof NodeStorage) {
+            await forageStorage.removeItemBatch(assets)
+        } else {
+            for (const asset of assets) {
                 await forageStorage.removeItem(asset)
             }
         }

@@ -166,6 +166,25 @@ export class NodeStorage{
         }
     }
 
+    async removeItemBatch(keys: String[]) {
+        await this.checkAuth()
+        const da = await fetch('/api/remove-batch', {
+            method: "POST",
+            headers: {
+                'risu-auth': auth,
+                'content-type': 'application/json'
+            },
+            body: JSON.stringify(keys.map(key => Buffer.from(key, 'utf-8').toString('hex')))
+        })
+        if(da.status < 200 || da.status >= 300){
+            throw "removeItemBatch Error"
+        }
+        const data = await da.json()
+        if(data.error){
+            throw data.error
+        }
+    }
+
     private async checkAuth(){
         if(!auth){
             auth = localStorage.getItem('risuauth')

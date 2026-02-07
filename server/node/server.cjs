@@ -481,6 +481,29 @@ app.get('/api/remove', async (req, res, next) => {
     }
 });
 
+app.post('/api/remove-batch', async (req, res, next) => {
+    if(req.headers['risu-auth']?.trim() !== password.trim()){
+        console.log('incorrect')
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    
+    const filesPath =req.body; // body에서 가져오기
+
+    try {
+        for(const filePath of filesPath){
+            await fs.rm(path.join(savePath, filePath));
+        }
+        res.send({
+            success: true,
+        });
+    } catch (error) {
+        next(error);
+    }
+})
+
 app.get('/api/list', async (req, res, next) => {
     if(req.headers['risu-auth'].trim() !== password.trim()){
         console.log('incorrect')

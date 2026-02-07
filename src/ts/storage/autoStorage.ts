@@ -84,6 +84,17 @@ export class AutoStorage{
         return await this.realStorage.removeItem(key)
     }
 
+    async removeItemBatch(keys: string[]) {
+        await this.Init()
+        if (this.realStorage instanceof NodeStorage) {
+            return await (this.realStorage as NodeStorage).removeItemBatch(keys)
+        } else {
+            for (const key of keys) {
+                await this.realStorage.removeItem(key)
+            }
+        }
+    }
+
     async checkAccountSync(){
         let db = getDatabase()
         if(this.isAccount){
