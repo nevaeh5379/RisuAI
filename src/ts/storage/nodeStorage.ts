@@ -25,6 +25,93 @@ export class NodeStorage{
         }
         return data.mtime;
     }
+
+    /**
+     * Batch write multiple items in parallel
+     * @param items - Array of {key, value} pairs
+     * @param batchSize - Number of items per batch request (default: 50)
+     * @param onProgress - Optional callback for progress updates
+     */
+    async setItemBatch(
+        items: Array<{key: string, value: Uint8Array}>,
+        batchSize: number = 128,
+        onProgress?: (current: number, total: number) => void
+    ): Promise<void> {
+        await this.checkAuth()
+        
+        // Separate large files (>5MB) from small files
+        const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
+        const largeFiles = items.filter(item => item.value.length > LARGE_FILE_THRESHOLD);
+        const smallFiles = items.filter(item => item.value.length <= LARGE_FILE_THRESHOLD);
+        
+        let processedCount = 0;
+        
+        // Process large files individually
+        for (const item of largeFiles) {
+            await this.setItem(item.key, item.value);
+            processedCount++;
+            if(onProgress) {
+                onProgress(processedCount, items.length);
+            }
+        }
+        
+        // Process small files in batches using binary concat format
+        for (let i = 0; i < smallFiles.length; i += batchSize) {
+            const batch = smallFiles.slice(i, i + batchSize)
+            
+            // Concatenate files with length prefixes: [filename_len(4)][filename][data_len(4)][data]
+            const chunks: Uint8Array[] = [];
+            for (const item of batch) {
+                const filenameBytes = new TextEncoder().encode(item.key);
+                const filenameLenBuf = new Uint8Array(4);
+                new DataView(filenameLenBuf.buffer).setUint32(0, filenameBytes.length, true);
+                
+                const dataLenBuf = new Uint8Array(4);
+                new DataView(dataLenBuf.buffer).setUint32(0, item.value.length, true);
+                
+                chunks.push(filenameLenBuf, filenameBytes, dataLenBuf, item.value);
+            }
+            
+            // Concat all chunks into single buffer
+            const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            const batchBuffer = new Uint8Array(totalLength);
+            let offset = 0;
+            for (const chunk of chunks) {
+                batchBuffer.set(chunk, offset);
+                offset += chunk.length;
+            }
+            
+            const da = await fetch('/api/write-batch', {
+                method: "POST",
+                body: batchBuffer,
+                headers: {
+                    'content-type': 'application/octet-stream',
+                    'risu-auth': auth
+                }
+            })
+            
+            if(da.status < 200 || da.status >= 300){
+                throw "setItemBatch Error"
+            }
+            
+            const data = await da.json()
+            if(data.error){
+                throw data.error
+            }
+            
+            // Check for individual file errors
+            const failedFiles = data.results?.filter((r: any) => !r.success)
+            if(failedFiles && failedFiles.length > 0){
+                console.warn('Some files failed to write:', failedFiles)
+            }
+            
+            processedCount += batch.length;
+            if(onProgress) {
+                onProgress(processedCount, items.length);
+            }
+        }
+    }
+
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()
         const da = await fetch('/api/read', {

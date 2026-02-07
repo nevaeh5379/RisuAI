@@ -26,6 +26,49 @@ export class AutoStorage{
         await this.realStorage.setItem(key, value)
         return null
     }
+
+    async setItemBatch(
+        items: Array<{key: string, value: Uint8Array}>,
+        batchSize: number = 128,
+        onProgress?: (current: number, total: number) => void
+    ): Promise<void> {
+        await this.Init()
+        
+        // For AccountStorage, we still need to call setItem individually
+        // but we can process them in batches concurrently
+        if(this.isAccount){
+            for (let i = 0; i < items.length; i += batchSize) {
+                const batch = items.slice(i, i + batchSize)
+                await Promise.all(batch.map(item => 
+                    (this.realStorage as AccountStorage).setItem(item.key, item.value)
+                ))
+                if(onProgress) {
+                    onProgress(Math.min(i + batchSize, items.length), items.length)
+                }
+            }
+            return
+        }
+
+        // For NodeStorage, use its built-in batch method
+        if (this.realStorage instanceof NodeStorage) {
+            await (this.realStorage as NodeStorage).setItemBatch(items, batchSize, onProgress)
+            return
+        }
+
+        // For other storage types (LocalForage, OPFS, etc.)
+        // batch them using Promise.all
+        for (let i = 0; i < items.length; i += batchSize) {
+            const batch = items.slice(i, i + batchSize)
+            
+            await Promise.all(batch.map(item => 
+                this.realStorage.setItem(item.key, item.value)
+            ))
+            
+            if(onProgress) {
+                onProgress(Math.min(i + batchSize, items.length), items.length)
+            }
+        }
+    }
     async getItem(key:string):Promise<Buffer> {
         await this.Init()
         return await this.realStorage.getItem(key)

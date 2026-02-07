@@ -537,6 +537,80 @@ app.post('/api/write', async (req, res, next) => {
     }
 });
 
+app.post('/api/write-batch', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        console.log('incorrect')
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+
+    try {
+        const results = [];
+        const bodyBuffer = req.body; // Raw buffer from express.raw()
+        
+        let offset = 0;
+        while (offset < bodyBuffer.length) {
+            // Read filename length (4 bytes)
+            if (offset + 4 > bodyBuffer.length) break;
+            const filenameLength = bodyBuffer.readUInt32LE(offset);
+            offset += 4;
+            
+            // Read filename
+            if (offset + filenameLength > bodyBuffer.length) break;
+            const filename = bodyBuffer.toString('utf-8', offset, offset + filenameLength);
+            offset += filenameLength;
+            
+            // Read data length (4 bytes)
+            if (offset + 4 > bodyBuffer.length) break;
+            const dataLength = bodyBuffer.readUInt32LE(offset);
+            offset += 4;
+            
+            // Read data
+            if (offset + dataLength > bodyBuffer.length) break;
+            const data = bodyBuffer.slice(offset, offset + dataLength);
+            offset += dataLength;
+            
+            // Write file
+            const filePath = Buffer.from(filename, 'utf-8').toString('hex');
+            
+            if(!isHex(filePath)){
+                results.push({
+                    key: filename,
+                    success: false,
+                    error: 'Invalid path'
+                });
+                continue;
+            }
+
+            try {
+                await fs.writeFile(path.join(savePath, filePath), data);
+                const stats = await fs.stat(path.join(savePath, filePath));
+                
+                results.push({
+                    key: filename,
+                    success: true,
+                    mtime: stats.mtimeMs
+                });
+            } catch (error) {
+                results.push({
+                    key: filename,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+
+        res.send({
+            success: true,
+            results
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 const oauthData = {
     client_id: '',
     client_secret: '',

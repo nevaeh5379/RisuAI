@@ -20,6 +20,9 @@
         resizable = false
     } = $props();
 
+    let mobileTextarea: HTMLTextAreaElement;
+    import { isMobile } from 'src/ts/platform';
+
     let editorContainer: HTMLElement;
     let editor: any;
     let monaco: any;
@@ -27,6 +30,14 @@
     let resizeObserver: ResizeObserver;
 
     onMount(async () => {
+        if (isMobile) {
+            if (autoResize && mobileTextarea) {
+                // Initial resize for mobile
+                resizeMobile();
+            }
+            return; 
+        }
+
         // Load Monaco
         monaco = await loader.init();
 
@@ -106,6 +117,15 @@
         resizeObserver.observe(editorContainer);
     });
 
+    function resizeMobile() {
+        if (!mobileTextarea || !autoResize) return;
+        mobileTextarea.style.height = 'auto';
+        const newHeight = mobileTextarea.scrollHeight;
+        const h = Math.max(minHeight, Math.min(newHeight, maxHeight));
+        height = `${h}px`;
+        mobileTextarea.style.height = height;
+    }
+
     // Sync value from prop to editor
     $effect(() => {
         if (editor && (value ?? '') !== editor.getValue()) {
@@ -168,11 +188,25 @@
     });
 </script>
 
-<div 
-    class="monaco-container" 
-    style="height: {height}; resize: {resizable ? 'vertical' : 'none'};" 
-    bind:this={editorContainer}
-></div>
+{#if isMobile}
+    <textarea
+        bind:this={mobileTextarea}
+        class="monaco-container monaco-mobile-textarea"
+        style="height: {height}; resize: {resizable ? 'vertical' : 'none'};"
+        bind:value={value}
+        oninput={() => { onInput(); resizeMobile(); }}
+        onkeydown={(e) => onKeyDown(e)}
+        onpaste={(e) => onPaste(e)}
+        readonly={options.readOnly}
+        spellcheck="false"
+    ></textarea>
+{:else}
+    <div 
+        class="monaco-container" 
+        style="height: {height}; resize: {resizable ? 'vertical' : 'none'};" 
+        bind:this={editorContainer}
+    ></div>
+{/if}
 
 <style>
     .monaco-container {
@@ -181,5 +215,19 @@
         border-radius: 0.375rem;
         border: 1px solid var(--risu-theme-borderc);
         background-color: transparent;
+    }
+    
+    .monaco-mobile-textarea {
+        color: var(--risu-theme-text);
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 0.5rem;
+        outline: none;
+        overflow-y: auto;
+    }
+    
+    .monaco-mobile-textarea:focus {
+        border-color: var(--risu-theme-main);
     }
 </style>

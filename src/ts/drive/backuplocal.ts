@@ -564,21 +564,35 @@ export function LoadLocalBackupFast(){
             input.remove();
 
             const reader = file.stream().getReader();
-            const CHUNK_SIZE = 1024 * 1024; // 1MB chunk size
             let bytesRead = 0;
             let remainingBuffer = new Uint8Array();
 
-            let pendingWrites: Promise<void>[] = [];
-            const MAX_CONCURRENT_WRITES = 50;
+            // Batch writing configuration
+            const BATCH_SIZE = 128;
+            const assetsToWrite: Array<{key: string, value: Uint8Array}> = [];
+            const tauriAssetsToWrite: Array<{name: string, data: Uint8Array}> = [];
             
             // To update UI less frequently
             let lastProgressUpdate = 0;
 
-            // Helper to execute pending writes if queue is full
-            const flushWrites = async (force = false) => {
-                if (pendingWrites.length >= MAX_CONCURRENT_WRITES || (force && pendingWrites.length > 0)) {
-                    await Promise.all(pendingWrites);
-                    pendingWrites = [];
+            // Helper to flush accumulated assets
+            const flushAssets = async (force = false) => {
+                const shouldFlush = force || assetsToWrite.length >= BATCH_SIZE || tauriAssetsToWrite.length >= BATCH_SIZE;
+                
+                if (!shouldFlush) {
+                    return;
+                }
+
+                if (isTauri && tauriAssetsToWrite.length > 0) {
+                    // Write Tauri assets in batch
+                    await Promise.all(tauriAssetsToWrite.map(item => 
+                        writeFile(`assets/` + item.name, item.data, { baseDir: BaseDirectory.AppData })
+                    ));
+                    tauriAssetsToWrite.length = 0;
+                } else if (!isTauri && assetsToWrite.length > 0) {
+                    // Use batch write for forageStorage
+                    await forageStorage.setItemBatch(assetsToWrite, BATCH_SIZE);
+                    assetsToWrite.length = 0;
                 }
             };
 
@@ -626,10 +640,8 @@ export function LoadLocalBackupFast(){
                     console.log(`[Restore] Processing: ${name}, size: ${data.length}`);
 
                     if (name === 'database.risudat') {
-                        // For database, we must finish all pending asset writes first to ensure consistency?
-                        // Actually, database restore usually triggers specific logic. 
-                        // The original code did it immediately. Let's flush writes first.
-                        await flushWrites(true);
+                        // For database, flush all pending assets first
+                        await flushAssets(true);
                         
                         const db = new Uint8Array(data);
                         const dbData = await decodeRisuSave(db);
@@ -653,27 +665,24 @@ export function LoadLocalBackupFast(){
                             });
                         }
                     } else {
-                        // For assets, push to queue
-                        const writeTask = (async () => {
-                            if (isTauri) {
-                                await writeFile(`assets/` + name, data, { baseDir: BaseDirectory.AppData });
-                            } else {
-                                await forageStorage.setItem('assets/' + name, data);
-                            }
-                        })();
-                        pendingWrites.push(writeTask);
-                        await flushWrites();
+                        // Collect assets for batch writing
+                        if (isTauri) {
+                            tauriAssetsToWrite.push({ name, data });
+                        } else {
+                            assetsToWrite.push({ key: 'assets/' + name, value: data });
+                        }
+                        
+                        // Flush when batch is full
+                        await flushAssets(false);
                     }
-                    
-                    // Removed individual sleeps to speed up
-                    // Removed account-specific sleeps (might need verification if this causes issues, but "Fast" implies risk)
                     
                     offset += 4 + nameLength + 4 + dataLength;
                 }
                 remainingBuffer = remainingBuffer.slice(offset);
             }
             
-            await flushWrites(true);
+            // Flush any remaining assets
+            await flushAssets(true);
             alertNormal('Success');
         };
 
