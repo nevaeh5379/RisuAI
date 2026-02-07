@@ -376,6 +376,92 @@ app.post('/api/set_password', async (req, res) => {
     res.status(400).send("already set")
 })
 
+app.post('/api/assets/stream', async (req, res, next) => {
+   if(req.headers['risu-auth'].trim() !== password.trim()){
+        console.log('incorrect')
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    // const filePaths = req.headers['file-paths'];
+    // if (!filePaths) {
+    //     return res.status(400).send({error: 'File paths required'})
+    // }
+
+    //기대 값
+    //['asset', 'name']
+    const filePaths = req.body;
+    if (!filePaths) {
+        return res.status(400).send({error: 'File paths required'})
+    }
+    console.log(`[Debug] Requested ${filePaths.length} file paths:`, filePaths.slice(0, 5));
+    try {
+        const validPaths = [];
+        for (const filePath of filePaths) {
+            // Convert the filePath to hex (same as other endpoints like /api/read, /api/write)
+            const hexPath = Buffer.from(filePath, 'utf-8').toString('hex');
+            const fullPath = path.join(savePath, hexPath);
+            if (existsSync(fullPath)) {
+                // Check if it's a file (not a directory)
+                const stats = await fs.stat(fullPath);
+                if (stats.isFile()) {
+                    validPaths.push({ filePath, fullPath });
+                } else {
+                    console.log(`[Warning] Skipping non-file: "${filePath}" (hex: ${hexPath}) at ${fullPath}`);
+                }
+            } else {
+                console.log(`[Debug] File not found: "${filePath}" (hex: ${hexPath}) at ${fullPath}`);
+            }
+        }
+        console.log(`[Debug] Valid file count: ${validPaths.length} out of ${filePaths.length}`);
+
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('X-File-Count', validPaths.length);
+        res.setHeader('Transfer-Encoding', 'chunked');
+        //a need unsafe?
+        //all of count files.
+        const countBuf = Buffer.allocUnsafe(4);
+        countBuf.writeUInt32LE(validPaths.length, 0);
+        res.write(countBuf);
+
+        const globalHasher = crypto.createHash('sha256');
+        globalHasher.update(countBuf)
+        
+
+        for (const {filePath, fullPath} of validPaths) {
+            const content = await fs.readFile(fullPath);
+            const filename = Buffer.from(filePath, 'utf8');
+            const fileHash = crypto.createHash('sha256').update(content).digest();
+            
+            const filenameLenBuf = Buffer.allocUnsafe(4);
+            filenameLenBuf.writeUInt32LE(filename.length, 0);
+            globalHasher.update(filenameLenBuf)
+            res.write(filenameLenBuf);
+            res.write(filename);
+            globalHasher.update(filename);
+
+            //최대 용량 4기가
+            const contentLenBuf = Buffer.allocUnsafe(4);
+            contentLenBuf.writeUInt32LE(content.length, 0);
+            res.write(contentLenBuf);
+            globalHasher.update(contentLenBuf)
+
+            res.write(content);
+            globalHasher.update(content);
+
+            res.write(fileHash);
+            globalHasher.update(fileHash);
+
+        }
+
+        const totalHash = globalHasher.digest();
+        res.write(totalHash);
+        res.end();
+    } catch (error) {
+        next(error)
+    }
+})
 app.get('/api/read', async (req, res, next) => {
     if(req.headers['risu-auth'].trim() !== password.trim()){
         console.log('incorrect')

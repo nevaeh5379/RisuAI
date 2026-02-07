@@ -1890,12 +1890,157 @@ export async function downloadRisuHub(id:string, arg:{
     }
 }
 
-export async function getHubResources(id:string) {
-    const res = await fetch(`${hubURL}/resource/${id}`)
-    if(res.status !== 200){
-        throw (await res.text())
+// IndexedDB cache for hub resources
+const DB_NAME = 'risuai-hub-cache';
+const DB_VERSION = 1;
+const STORE_NAME = 'resources';
+const CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7일
+
+interface CachedResource {
+    id: string;
+    data: ArrayBuffer;
+    timestamp: number;
+}
+
+// IndexedDB 초기화
+async function openHubCache(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        
+        request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+            }
+        };
+    });
+}
+
+// IndexedDB에서 리소스 읽기
+async function getCachedResource(id: string): Promise<Buffer | null> {
+    try {
+        const db = await openHubCache();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(id);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+                const result = request.result as CachedResource | undefined;
+                if (!result) {
+                    resolve(null);
+                    return;
+                }
+                
+                // TTL 체크
+                const now = Date.now();
+                if (now - result.timestamp > CACHE_TTL) {
+                    // 만료된 캐시 삭제
+                    deleteCachedResource(id).catch(console.error);
+                    resolve(null);
+                    return;
+                }
+                
+                resolve(Buffer.from(result.data));
+            };
+        });
+    } catch (error) {
+        console.error('Failed to get cached resource:', error);
+        return null;
     }
-    return Buffer.from(await (res).arrayBuffer())
+}
+
+// IndexedDB에 리소스 저장
+async function setCachedResource(id: string, data: Buffer): Promise<void> {
+    try {
+        const db = await openHubCache();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const resource: CachedResource = {
+                id,
+                data: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer,
+                timestamp: Date.now()
+            };
+            const request = store.put(resource);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    } catch (error) {
+        console.error('Failed to set cached resource:', error);
+    }
+}
+
+// IndexedDB에서 리소스 삭제
+async function deleteCachedResource(id: string): Promise<void> {
+    try {
+        const db = await openHubCache();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.delete(id);
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    } catch (error) {
+        console.error('Failed to delete cached resource:', error);
+    }
+}
+
+// 모든 캐시 삭제
+async function clearAllCachedResources(): Promise<void> {
+    try {
+        const db = await openHubCache();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve();
+        });
+    } catch (error) {
+        console.error('Failed to clear cached resources:', error);
+    }
+}
+
+export async function getHubResources(id:string) {
+    // IndexedDB 캐시 확인
+    const cached = await getCachedResource(id);
+    if (cached) {
+        return cached;
+    }
+    
+    // 캐시가 없으면 API 호출
+    const res = await fetch(`${hubURL}/resource/${id}`);
+    if(res.status !== 200){
+        throw (await res.text());
+    }
+    const buffer = Buffer.from(await res.arrayBuffer());
+    
+    // IndexedDB에 저장 (비동기, 실패해도 무시)
+    setCachedResource(id, buffer).catch(console.error);
+    
+    return buffer;
+}
+
+/**
+ * Hub 리소스 캐시를 수동으로 무효화합니다.
+ * @param id 특정 리소스 ID만 무효화하려면 전달, 전체 무효화는 undefined
+ */
+export async function clearHubResourceCache(id?: string): Promise<void> {
+    if (id) {
+        await deleteCachedResource(id);
+    } else {
+        await clearAllCachedResources();
+    }
 }
 
 export function isCharacterHasAssets(char:character|groupChat){

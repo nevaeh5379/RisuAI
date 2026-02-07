@@ -1,9 +1,10 @@
 <script lang="ts">
     import { BookIcon, ImageIcon, SmileIcon } from "@lucide/svelte";
     import { alertNormal } from "src/ts/alert";
-    import { hubURL, type hubType } from "src/ts/characterCards";
+    import { getHubResources, type hubType } from "src/ts/characterCards";
     import { DBState } from "src/ts/stores.svelte";
     import { parseMultilangString } from "src/ts/util";
+    import { onMount } from "svelte";
 
     interface Props {
         onClick?: any;
@@ -11,6 +12,29 @@
     }
 
     let { onClick = () => {}, chara }: Props = $props();
+    let imageUrl = $state<string | null>(null);
+
+    // 이미지 로드 (IndexedDB 캐시 사용)
+    onMount(async () => {
+        if (DBState.db.hideAllImages) {
+            return;
+        }
+        
+        try {
+            const buffer = await getHubResources(chara.img);
+            const blob = new Blob([buffer], { type: 'image/png' });
+            imageUrl = URL.createObjectURL(blob);
+        } catch (error) {
+            console.error('Failed to load hub icon:', error);
+        }
+        
+        // 컴포넌트 언마운트 시 Blob URL 정리
+        return () => {
+            if (imageUrl) {
+                URL.revokeObjectURL(imageUrl);
+            }
+        };
+    });
 
 </script>
 
@@ -21,8 +45,12 @@
         <div class="w-20 min-w-20 h-20 sm:h-28 sm:w-28 rounded-md bg-darkbutton flex items-center justify-center text-textcolor2">
             <span class="text-4xl">?</span>
         </div>
+    {:else if imageUrl}
+        <img class="w-20 min-w-20 h-20 sm:h-28 sm:w-28 rounded-md object-top object-cover" alt={chara.name} src={imageUrl}>
     {:else}
-        <img class="w-20 min-w-20 h-20 sm:h-28 sm:w-28 rounded-md object-top object-cover" alt={chara.name} src={`${hubURL}/resource/` + chara.img}>
+        <div class="w-20 min-w-20 h-20 sm:h-28 sm:w-28 rounded-md bg-darkbutton flex items-center justify-center text-textcolor2">
+            <span class="text-sm">Loading...</span>
+        </div>
     {/if}
     <div class="flex flex-col grow min-w-0">
         <span class="text-textcolor text-lg min-w-0 max-w-full text-ellipsis whitespace-nowrap overflow-hidden text-start">{chara.name}</span>
@@ -58,4 +86,4 @@
             {/if}
         </div>
     </div>
-</div></button>
+    </div></button>
