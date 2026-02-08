@@ -498,6 +498,7 @@ app.get('/api/read', async (req, res, next) => {
     }
 });
 
+
 app.get('/api/meta', async (req, res, next) => {
     if(req.headers['risu-auth'].trim() !== password.trim()){
         res.status(400).send({
@@ -530,6 +531,303 @@ app.get('/api/meta', async (req, res, next) => {
                 mtime: stats.mtimeMs
             });
         }
+    } catch (error) {
+        next(error);
+    }
+});
+
+app.get('/api/hash', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    const filePath = req.headers['file-path'];
+    if (!filePath) {
+        res.status(400).send({
+            error:'File path required'
+        });
+        return;
+    }
+
+    if(!isHex(filePath)){
+        res.status(400).send({
+            error:'Invaild Path'
+        });
+        return;
+    }
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ hash: '' }); 
+        }
+        else{
+            const fileData = await fs.readFile(fullPath);
+            const hash = crypto.createHash('sha256');
+            hash.update(fileData);
+            res.send({
+                hash: hash.digest('hex')
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+const CHUNK_SIZE = 1024 * 1024; // 1024KB = 1MB
+
+// 파일을 청크로 나눈 후 각 청크의 해시 반환
+app.get('/api/chunk-hashes', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    const filePath = req.headers['file-path'];
+    if (!filePath) {
+        res.status(400).send({
+            error:'File path required'
+        });
+        return;
+    }
+
+    if(!isHex(filePath)){
+        res.status(400).send({
+            error:'Invaild Path'
+        });
+        return;
+    }
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ hashes: [], totalSize: 0 }); 
+        }
+        else{
+            const fileData = await fs.readFile(fullPath);
+            const totalSize = fileData.length;
+            const chunkCount = Math.ceil(totalSize / CHUNK_SIZE);
+            const hashes = [];
+            
+            for (let i = 0; i < chunkCount; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, totalSize);
+                const chunk = fileData.slice(start, end);
+                const hash = crypto.createHash('sha256');
+                hash.update(chunk);
+                hashes.push(hash.digest('hex'));
+            }
+            
+            res.send({
+                hashes: hashes,
+                totalSize: totalSize,
+                chunkSize: CHUNK_SIZE
+            });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 특정 인덱스의 청크들만 읽기
+app.post('/api/chunk-read', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({
+            error:'Password Incorrect'
+        });
+        return
+    }
+    const filePath = req.headers['file-path'];
+    const chunkIndexes = req.body.indexes; // [0, 2, 5] 형태
+    
+    if (!filePath || !chunkIndexes) {
+        res.status(400).send({
+            error:'File path and indexes required'
+        });
+        return;
+    }
+
+    if(!isHex(filePath)){
+        res.status(400).send({
+            error:'Invaild Path'
+        });
+        return;
+    }
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ chunks: [] }); 
+        }
+        else{
+            const fileData = await fs.readFile(fullPath);
+            const chunks = [];
+            
+            for (const idx of chunkIndexes) {
+                const start = idx * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, fileData.length);
+                if (start < fileData.length) {
+                    const chunk = fileData.slice(start, end);
+                    chunks.push({
+                        index: idx,
+                        data: chunk.toString('base64'),
+                        hash: crypto.createHash('sha256').update(chunk).digest('hex')
+                    });
+                }
+            }
+            
+            res.send({ chunks: chunks });
+        }
+    } catch (error) {
+        next(error);
+    }
+});
+
+const RISUSAVE_HEADER = Buffer.from('RISUSAVE\0');
+
+// RisuSave 파일에서 블록 메타데이터 추출
+function parseRisuSaveBlocks(data) {
+    if (!data.subarray(0, RISUSAVE_HEADER.length).equals(RISUSAVE_HEADER)) {
+        return null; // RisuSave 포맷이 아님
+    }
+    
+    const blocks = [];
+    let offset = RISUSAVE_HEADER.length;
+    
+    while (offset < data.length) {
+        try {
+            const blockStart = offset;
+            const type = data[offset];
+            const compression = data[offset + 1] === 1;
+            offset += 2;
+            
+            const nameLength = data[offset];
+            offset += 1;
+            const name = data.subarray(offset, offset + nameLength).toString('utf-8');
+            offset += nameLength;
+            
+            const lengthBuf = Buffer.alloc(4);
+            data.copy(lengthBuf, 0, offset, offset + 4);
+            const length = lengthBuf.readUInt32LE(0);
+            offset += 4;
+            
+            const blockData = data.subarray(offset, offset + length);
+            offset += length;
+            
+            const blockEnd = offset;
+            
+            // 블록 데이터의 해시 계산
+            const hash = crypto.createHash('sha256');
+            hash.update(blockData);
+            
+            blocks.push({
+                name,
+                type,
+                compression,
+                offset: blockStart,
+                length: blockEnd - blockStart,
+                dataOffset: blockEnd - length,
+                dataLength: length,
+                hash: hash.digest('hex')
+            });
+        } catch (error) {
+            break;
+        }
+    }
+    
+    return blocks;
+}
+
+// RisuSave 블록별 해시 반환
+app.get('/api/block-hashes', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({ error:'Password Incorrect' });
+        return;
+    }
+    const filePath = req.headers['file-path'];
+    if (!filePath || !isHex(filePath)) {
+        res.status(400).send({ error:'Invalid path' });
+        return;
+    }
+
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ blocks: [], totalSize: 0 });
+            return;
+        }
+        
+        const fileData = await fs.readFile(fullPath);
+        const blocks = parseRisuSaveBlocks(fileData);
+        
+        if (!blocks) {
+            // RisuSave 포맷이 아니면 전체 파일 해시만 반환
+            const hash = crypto.createHash('sha256');
+            hash.update(fileData);
+            res.send({ 
+                blocks: null, 
+                totalSize: fileData.length,
+                fileHash: hash.digest('hex')
+            });
+            return;
+        }
+        
+        res.send({
+            blocks: blocks.map(b => ({
+                name: b.name,
+                hash: b.hash,
+                length: b.length
+            })),
+            totalSize: fileData.length
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
+// 특정 블록들만 읽기
+app.post('/api/block-read', async (req, res, next) => {
+    if(req.headers['risu-auth'].trim() !== password.trim()){
+        res.status(400).send({ error:'Password Incorrect' });
+        return;
+    }
+    const filePath = req.headers['file-path'];
+    const blockNames = req.body.blocks; // ['root', 'char123', ...]
+    
+    if (!filePath || !blockNames || !isHex(filePath)) {
+        res.status(400).send({ error:'Invalid request' });
+        return;
+    }
+
+    try {
+        const fullPath = path.join(savePath, filePath);
+        if(!existsSync(fullPath)){
+            res.send({ blocks: [] });
+            return;
+        }
+        
+        const fileData = await fs.readFile(fullPath);
+        const allBlocks = parseRisuSaveBlocks(fileData);
+        
+        if (!allBlocks) {
+            res.status(400).send({ error: 'Not a RisuSave file' });
+            return;
+        }
+        
+        const requestedBlocks = [];
+        for (const blockName of blockNames) {
+            const block = allBlocks.find(b => b.name === blockName);
+            if (block) {
+                const blockRawData = fileData.subarray(block.offset, block.offset + block.length);
+                requestedBlocks.push({
+                    name: block.name,
+                    data: blockRawData.toString('base64'),
+                    hash: block.hash
+                });
+            }
+        }
+        
+        res.send({ blocks: requestedBlocks });
     } catch (error) {
         next(error);
     }
