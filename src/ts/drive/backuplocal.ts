@@ -80,45 +80,43 @@ export async function SaveLocalBackupFast(){
     }
     const missingAssets: string[] = []
 
+
     if(isTauri){
         const assets = await readDir('assets', {baseDir: BaseDirectory.AppData})
-        const BATCH_SIZE = 50;
+        let processedCount = 0;
+        let lastUpdateTime = 0;
 
-        for (let i = 0; i < assets.length; i += BATCH_SIZE) {
-            const batch = assets.slice(i, i + BATCH_SIZE);
-            const readPromises = batch.map(async (asset) => {
-                const key = asset.name;
-                if (!key) {
-                    return null;
-                }
-                try {
-                    const data = await readFile('assets/' + asset.name, {baseDir: BaseDirectory.AppData});
-                    return { key, data };
-                } catch (e) {
-                    return { key, error: true };
-                }
-            });
+        for (const asset of assets) {
+            processedCount++;
+            const key = asset.name;
+            if (!key) continue;
 
-            const results = await Promise.all(readPromises);
-
-            for (const res of results) {
-                if (!res) continue;
-                if (res.data) {
-                    await writer.writeBackup(res.key, res.data);
-                } else if (res.error || res.key) {
-                    missingAssets.push(res.key || 'unknown');
+            try {
+                // 대용량 파일 처리를 위해 순차적으로 읽고 쓰기 (메모리 문제 방지)
+                const data = await readFile('assets/' + key, {baseDir: BaseDirectory.AppData});
+                if (data) {
+                    await writer.writeBackup(key, data);
                 }
+            } catch (e) {
+                console.error(`Failed to backup asset: ${key}`, e);
+                missingAssets.push(key);
             }
 
-            let message = `Saving local Backup... (${Math.min(i + BATCH_SIZE, assets.length)} / ${assets.length})`;
-            if (missingAssets.length > 0) {
-                const skippedItems = missingAssets.map(key => {
-                    const assetInfo = assetMap.get(key);
-                    return assetInfo ? `'${assetInfo.assetName}' from ${assetInfo.charName}` : `'${key}'`;
-                }).join(', ');
-                message += `\n(Skipping... ${skippedItems})`;
+            // 진행률 업데이트 (100ms마다)
+            if (Date.now() - lastUpdateTime > 100) {
+                let message = `Saving local Backup... (${processedCount} / ${assets.length})`;
+                if (missingAssets.length > 0) {
+                     // 누락된 에셋 정보 표시 (이전과 동일)
+                    const skippedItems = missingAssets.slice(-3).map(k => { // 최근 3개만 표시
+                        const assetInfo = assetMap.get(k);
+                        return assetInfo ? `'${assetInfo.assetName}'` : `'${k}'`;
+                    }).join(', ');
+                    if (missingAssets.length > 3) message += `\n(Skipping... ${skippedItems} +${missingAssets.length - 3} more)`;
+                    else message += `\n(Skipping... ${skippedItems})`;
+                }
+                alertWait(message);
+                lastUpdateTime = Date.now();
             }
-            alertWait(message);
         }
     }
     else{
@@ -128,13 +126,18 @@ export async function SaveLocalBackupFast(){
         for (let i = 0; i < keys.length; i += BATCH_SIZE) {
             const batch = keys.slice(i, i + BATCH_SIZE);
             if (forageStorage.realStorage instanceof NodeStorage) {
-                await forageStorage.realStorage.streamAssets(batch, (name, file) => {
+                const pendingBatch = new Set(batch);
+                await forageStorage.realStorage.streamAssets(batch, async (name, file) => {
                     if (file) {
-                         writer.writeBackup(name, file)
-                    } else {
-                        missingAssets.push(name)
+                         await writer.writeBackup(name, file)
+                         pendingBatch.delete(name)
                     }
                 })
+                
+                // streamAssets가 끝난 후에도 Set에 남아있는 파일들은 누락된 것으로 간주
+                for (const missing of pendingBatch) {
+                    missingAssets.push(missing)
+                }
             }
             else {
 const readPromises = batch.map(async (key) => {
@@ -574,84 +577,160 @@ export function LoadLocalBackupFast(){
             const file = input.files[0];
             input.remove();
 
-            const reader = file.stream().getReader();
-            let bytesRead = 0;
-            let remainingBuffer = new Uint8Array();
-
-            // Batch writing configuration
             const BATCH_SIZE = 128;
+            const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+            const CHUNK_SIZE = 16 * 1024 * 1024; // 16MB chunks for large files
             const assetsToWrite: Array<{key: string, value: Uint8Array}> = [];
             const tauriAssetsToWrite: Array<{name: string, data: Uint8Array}> = [];
-            
-            // To update UI less frequently
             let lastProgressUpdate = 0;
-
-            // Helper to flush accumulated assets
+            
             const flushAssets = async (force = false) => {
                 const shouldFlush = force || assetsToWrite.length >= BATCH_SIZE || tauriAssetsToWrite.length >= BATCH_SIZE;
-                
-                if (!shouldFlush) {
-                    return;
-                }
+                if (!shouldFlush) return;
 
                 if (isTauri && tauriAssetsToWrite.length > 0) {
-                    // Write Tauri assets in batch
                     await Promise.all(tauriAssetsToWrite.map(item => 
                         writeFile(`assets/` + item.name, item.data, { baseDir: BaseDirectory.AppData })
                     ));
                     tauriAssetsToWrite.length = 0;
                 } else if (!isTauri && assetsToWrite.length > 0) {
-                    // Use batch write for forageStorage
                     await forageStorage.setItemBatch(assetsToWrite, BATCH_SIZE);
                     assetsToWrite.length = 0;
                 }
             };
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    break;
-                }
+            // 작은 데이터 읽기 (헤더용)
+            const readBytes = async (start: number, length: number): Promise<Uint8Array> => {
+                const blob = file.slice(start, start + length);
+                const buffer = await blob.arrayBuffer();
+                return new Uint8Array(buffer);
+            };
 
-                bytesRead += value.length;
+            // 대용량 데이터 청크 단위로 읽기
+            const readLargeData = async (start: number, length: number): Promise<Uint8Array> => {
+                const chunks: Uint8Array[] = [];
+                let bytesRead = 0;
                 
-                // Throttle UI updates
-                if (Date.now() - lastProgressUpdate > 100) {
-                    const progress = ((bytesRead / file.size) * 100).toFixed(2);
-                    alertWait(`Loading local Backup... (${progress}%)`);
-                    lastProgressUpdate = Date.now();
+                while (bytesRead < length) {
+                    const chunkLength = Math.min(CHUNK_SIZE, length - bytesRead);
+                    const blob = file.slice(start + bytesRead, start + bytesRead + chunkLength);
+                    const buffer = await blob.arrayBuffer();
+                    const chunk = new Uint8Array(buffer);
+                    
+                    // 실제 읽은 바이트 수 확인
+                    if (chunk.length !== chunkLength) {
+                        console.warn(`[LoadBackup] Chunk size mismatch: expected ${chunkLength}, got ${chunk.length}`);
+                    }
+                    
+                    chunks.push(chunk);
+                    bytesRead += chunk.length; // 실제 읽은 바이트 수 사용!
+                    
+                    // 진행 상황 업데이트
+                    if (Date.now() - lastProgressUpdate > 200) {
+                        const totalProgress = ((start + bytesRead) / file.size * 100).toFixed(1);
+                        alertWait(`Loading large file... (${totalProgress}%)`);
+                        lastProgressUpdate = Date.now();
+                    }
                 }
-
-                const newBuffer = new Uint8Array(remainingBuffer.length + value.length);
-                newBuffer.set(remainingBuffer);
-                newBuffer.set(value, remainingBuffer.length);
-                remainingBuffer = newBuffer;
-
+                
+                // 청크들을 합치기
+                const totalRead = chunks.reduce((sum, c) => sum + c.length, 0);
+                console.log(`[LoadBackup] readLargeData: expected ${length}, actually read ${totalRead}`);
+                
+                const result = new Uint8Array(totalRead);
                 let offset = 0;
-                while (offset + 4 <= remainingBuffer.length) {
-                    const nameLength = new Uint32Array(remainingBuffer.slice(offset, offset + 4).buffer)[0];
+                for (const chunk of chunks) {
+                    result.set(chunk, offset);
+                    offset += chunk.length;
+                }
+                return result;
+            };
 
-                    if (offset + 4 + nameLength > remainingBuffer.length) {
+            let offset = 0;
+            let recordCount = 0;
+            
+            // 파일 시작 부분 확인 (포맷 검증)
+            const headerBytes = await readBytes(0, Math.min(100, file.size));
+            const headerHex = Array.from(headerBytes.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+            console.log(`[LoadBackup] File header (first 32 bytes): ${headerHex}`);
+            console.log(`[LoadBackup] File size: ${file.size} bytes`);
+            
+            // RisuSave 포맷 체크 (아마도 다른 포맷일 수 있음)
+            const headerText = new TextDecoder().decode(headerBytes.slice(0, 20));
+            console.log(`[LoadBackup] Header as text: ${headerText.replace(/[^\x20-\x7E]/g, '?')}`);
+            
+            try {
+                while (offset < file.size) {
+                    // 1. nameLength 읽기 (4 bytes)
+                    if (offset + 4 > file.size) break;
+                    const nameLengthBytes = await readBytes(offset, 4);
+                    const nameLength = new DataView(nameLengthBytes.buffer).getUint32(0, true);
+                    
+                    if (nameLength > 10000) {
+                        // 디버깅: 에러 지점 주변 바이트 출력
+                        const debugBytes = await readBytes(offset, Math.min(64, file.size - offset));
+                        const hexDump = Array.from(debugBytes.slice(0, 32)).map(b => b.toString(16).padStart(2, '0')).join(' ');
+                        console.error(`[LoadBackup] Invalid nameLength=${nameLength} at offset=${offset}`);
+                        console.error(`[LoadBackup] Bytes at error: ${hexDump}`);
+                        
+                        // 근처에서 유효한 nameLength(64 또는 68) 검색
+                        console.log(`[LoadBackup] Searching for valid nameLength nearby...`);
+                        for (let searchOffset = -8; searchOffset <= 8; searchOffset += 4) {
+                            if (offset + searchOffset < 0) continue;
+                            const testBytes = await readBytes(offset + searchOffset, 4);
+                            const testLen = new DataView(testBytes.buffer).getUint32(0, true);
+                            if (testLen === 64 || testLen === 68) {
+                                // 다음 바이트가 '0'(0x30)으로 시작하는지 확인 (해시 시작)
+                                const nextByte = await readBytes(offset + searchOffset + 4, 1);
+                                if (nextByte[0] === 0x30) { // '0'
+                                    console.log(`[LoadBackup] Found valid nameLength=${testLen} at offset=${offset + searchOffset} (drift=${searchOffset})`);
+                                }
+                            }
+                        }
                         break;
                     }
-                    const nameBuffer = remainingBuffer.slice(offset + 4, offset + 4 + nameLength);
-                    const name = new TextDecoder().decode(nameBuffer);
-
-                    if (offset + 4 + nameLength + 4 > remainingBuffer.length) {
+                    
+                    // 2. name 읽기
+                    if (offset + 4 + nameLength > file.size) break;
+                    const nameBytes = await readBytes(offset + 4, nameLength);
+                    const name = new TextDecoder().decode(nameBytes);
+                    
+                    // 3. dataLength 읽기 (4 bytes)
+                    if (offset + 4 + nameLength + 4 > file.size) break;
+                    const dataLengthBytes = await readBytes(offset + 4 + nameLength, 4);
+                    const dataLength = new DataView(dataLengthBytes.buffer).getUint32(0, true);
+                    
+                    if (dataLength > 2147483647) {
+                        console.error(`[LoadBackup] Invalid dataLength=${dataLength} for ${name}`);
                         break;
                     }
-                    const dataLength = new Uint32Array(remainingBuffer.slice(offset + 4 + nameLength, offset + 4 + nameLength + 4).buffer)[0];
-
-                    if (offset + 4 + nameLength + 4 + dataLength > remainingBuffer.length) {
-                        break;
+                    
+                    const dataStart = offset + 4 + nameLength + 4;
+                    if (dataStart + dataLength > file.size) break;
+                    
+                    // 4. data 읽기 - 크기에 따라 다른 방식 사용
+                    console.log(`[LoadBackup] Record #${recordCount}: name="${name.slice(0,20)}...", nameLen=${nameLength}, dataLen=${dataLength}`);
+                    console.log(`[LoadBackup]   offset=${offset}, dataStart=${dataStart}, nextOffset=${dataStart + dataLength}`);
+                    
+                    const data = dataLength > LARGE_FILE_THRESHOLD 
+                        ? await readLargeData(dataStart, dataLength)
+                        : await readBytes(dataStart, dataLength);
+                    
+                    // 실제 읽은 바이트 수 확인
+                    if (data.length !== dataLength) {
+                        console.error(`[LoadBackup] Data size mismatch! expected=${dataLength}, got=${data.length}`);
                     }
-                    const data = remainingBuffer.slice(offset + 4 + nameLength + 4, offset + 4 + nameLength + 4 + dataLength);
-
-                    // Debug logging
-                    console.log(`[Restore] Processing: ${name}, size: ${data.length}`);
+                    
+                    offset = dataStart + dataLength;
+                    recordCount++;
+                    
+                    if (Date.now() - lastProgressUpdate > 100) {
+                        const progress = ((offset / file.size) * 100).toFixed(1);
+                        alertWait(`Loading backup... (${progress}%, ${recordCount} files)`);
+                        lastProgressUpdate = Date.now();
+                    }
 
                     if (name === 'database.risudat') {
-                        // For database, flush all pending assets first
                         await flushAssets(true);
                         
                         const db = new Uint8Array(data);
@@ -659,40 +738,40 @@ export function LoadLocalBackupFast(){
                         setDatabaseLite(dbData);
                         requiresFullEncoderReload.state = true;
                         
-                        // Database write is separate and critical, do it immediately
                         if (isTauri) {
                             await writeFile('database/database.bin', db, { baseDir: BaseDirectory.AppData });
                             await relaunch();
-                            alertStore.set({
-                                type: "wait",
-                                msg: "Success, Refreshing your app."
-                            });
+                            alertStore.set({ type: "wait", msg: "Success, Refreshing your app." });
                         } else {
                             await forageStorage.setItem('database/database.bin', db);
                             location.search = '';
-                            alertStore.set({
-                                type: "wait",
-                                msg: "Success, Refreshing your app."
-                            });
+                            alertStore.set({ type: "wait", msg: "Success, Refreshing your app." });
                         }
                     } else {
-                        // Collect assets for batch writing
-                        if (isTauri) {
-                            tauriAssetsToWrite.push({ name, data });
+                        // 대용량 파일은 바로 저장
+                        if (dataLength > LARGE_FILE_THRESHOLD) {
+                            await flushAssets(true);
+                            if (isTauri) {
+                                await writeFile(`assets/` + name, data, { baseDir: BaseDirectory.AppData });
+                            } else {
+                                await forageStorage.setItem('assets/' + name, data);
+                            }
                         } else {
-                            assetsToWrite.push({ key: 'assets/' + name, value: data });
+                            if (isTauri) {
+                                tauriAssetsToWrite.push({ name, data });
+                            } else {
+                                assetsToWrite.push({ key: 'assets/' + name, value: data });
+                            }
+                            await flushAssets(false);
                         }
-                        
-                        // Flush when batch is full
-                        await flushAssets(false);
                     }
-                    
-                    offset += 4 + nameLength + 4 + dataLength;
                 }
-                remainingBuffer = remainingBuffer.slice(offset);
+            } catch (e) {
+                console.error('[LoadBackup] Error during parsing:', e);
+                alertError('Failed, Is file corrupted?');
+                return;
             }
             
-            // Flush any remaining assets
             await flushAssets(true);
             alertNormal('Success');
         };

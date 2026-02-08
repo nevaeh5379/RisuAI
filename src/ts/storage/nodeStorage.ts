@@ -228,8 +228,13 @@ function getBlockCacheKey(fileKey: string, blockName: string): string {
 
 // 블록 기반 getItem 구현 (RisuSave 전용)
 async function getItemWithBlocks(key: string): Promise<Buffer | null> {
+    console.log(`[BlockSync] ${key}: 시작`);
+    
     // 1. 서버에서 블록 해시들 가져오기
+    console.log(`[BlockSync] ${key}: 서버 블록 해시 요청 중...`);
     const serverInfo = await getBlockHashes(key);
+    console.log(`[BlockSync] ${key}: 서버 블록 해시 응답 받음`, serverInfo);
+    
     if (!serverInfo) {
         console.log(`[BlockSync] ${key}: 서버 정보 없음`);
         return null;
@@ -249,14 +254,31 @@ async function getItemWithBlocks(key: string): Promise<Buffer | null> {
     const serverBlocks = serverInfo.blocks;
     console.log(`[BlockSync] ${key}: 서버 블록 ${serverBlocks.length}개, 총 ${(serverInfo.totalSize / 1024 / 1024).toFixed(2)}MB`);
     
-    // 2. 캐시된 블록들과 비교
+    // 서버에 블록이 없으면 전체 다운로드 필요 (초기 상태)
+    if (serverBlocks.length === 0 || serverInfo.totalSize === 0) {
+        console.log(`[BlockSync] ${key}: 서버에 데이터 없음 → 전체 다운로드`);
+        return null;
+    }
+    
+    
+    // 2. 캐시된 블록들과 비교 (병렬 처리)
+    console.log(`[BlockSync] ${key}: 캐시 블록 조회 시작 (${serverBlocks.length}개)`);
     const changedBlocks: string[] = [];
     const cachedBlockData: Map<string, Buffer> = new Map();
     
-    for (const serverBlock of serverBlocks) {
+    // 모든 블록을 병렬로 조회
+    const blockCheckPromises = serverBlocks.map(async (serverBlock) => {
         const blockCacheKey = getBlockCacheKey(key, serverBlock.name);
         const cachedBlock = await getCachedNodeItem(blockCacheKey);
-        
+        return { serverBlock, cachedBlock };
+    });
+    
+    console.log(`[BlockSync] ${key}: Promise.all 대기 중...`);
+    const blockCheckResults = await Promise.all(blockCheckPromises);
+    console.log(`[BlockSync] ${key}: 캐시 조회 완료`);
+    
+    // 결과 처리
+    for (const { serverBlock, cachedBlock } of blockCheckResults) {
         if (!cachedBlock || cachedBlock.hash !== serverBlock.hash) {
             changedBlocks.push(serverBlock.name);
         } else {
@@ -363,68 +385,23 @@ export class NodeStorage{
         this.invalidateKeysCache(); // keys 캐시 무효화
         
         // 캐시 업데이트 (삭제 대신 새 데이터로 업데이트)
+        // NOTE: database.bin은 getItem에서 블록 기반 동기화로 캐시되므로,
+        // setItem에서는 캐시를 업데이트하지 않음 (대용량 파일 처리 시 성능 문제 방지)
         if (key === 'database/database.bin') {
-            // database.bin은 블록 기반으로 캐시 업데이트
-            const buf = Buffer.from(value);
-            const RISUSAVE_HEADER = Buffer.from('RISUSAVE\0');
-            
-            // RisuSave 포맷인지 확인
-            if (buf.subarray(0, RISUSAVE_HEADER.length).equals(RISUSAVE_HEADER)) {
-                // 블록 파싱 및 개별 저장
-                let offset = RISUSAVE_HEADER.length;
-                const blockNames: string[] = [];
-                
-                while (offset < buf.length) {
-                    try {
-                        const blockStart = offset;
-                        const type = buf[offset];
-                        const compression = buf[offset + 1] === 1;
-                        offset += 2;
-                        
-                        const nameLength = buf[offset];
-                        offset += 1;
-                        const name = buf.subarray(offset, offset + nameLength).toString('utf-8');
-                        offset += nameLength;
-                        
-                        const lengthBuf = Buffer.alloc(4);
-                        buf.copy(lengthBuf, 0, offset, offset + 4);
-                        const length = lengthBuf.readUInt32LE(0);
-                        offset += 4;
-                        
-                        const blockData = buf.subarray(offset, offset + length);
-                        offset += length;
-                        
-                        const blockEnd = offset;
-                        
-                        // 블록 해시 계산
-                        const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', blockData);
-                        const hashArray = Array.from(new Uint8Array(hashBuffer));
-                        const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                        
-                        // 블록 전체 (헤더 포함) 저장
-                        const blockFullData = buf.subarray(blockStart, blockEnd);
-                        const blockCacheKey = getBlockCacheKey(key, name);
-                        await setCachedNodeItem(blockCacheKey, blockFullData, hash);
-                        blockNames.push(name);
-                    } catch (e) {
-                        break;
-                    }
-                }
-                
-                console.log(`[BlockSync] ${key}: 로컬 저장 → 캐시 업데이트 (${blockNames.length} 블록)`);
-            } else {
-                // RisuSave 포맷 아니면 전체 해시로 저장
-                const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', value.buffer as ArrayBuffer);
-                const hashArray = Array.from(new Uint8Array(hashBuffer));
-                const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-                await setCachedNodeItem(key, buf, hash);
-            }
+            // database.bin은 캐시 갱신 생략 - 다음 getItem에서 자동으로 동기화됨
+            console.log(`[BlockSync] ${key}: 로컬 저장 완료 (캐시 갱신 생략)`);
         } else {
-            // 일반 파일은 전체 해시로 저장
-            const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', value.buffer as ArrayBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            await setCachedNodeItem(key, Buffer.from(value), hash);
+            // 일반 파일은 전체 해시로 저장 (crypto API 있을 때만)
+            if (globalThis.crypto?.subtle && value.length > 0) {
+                try {
+                    const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', value.buffer as ArrayBuffer);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    await setCachedNodeItem(key, Buffer.from(value), hash);
+                } catch (e) {
+                    console.warn(`[Cache] Failed to cache ${key}:`, e);
+                }
+            }
         }
         
         return data.mtime;
@@ -518,7 +495,7 @@ export class NodeStorage{
         this.invalidateKeysCache(); // 캐시 무효화
     }
 
-   async streamAssets(filePaths: string[], onFile:(name: string, file: Uint8Array) => void ) {
+    async streamAssets(filePaths: string[], onFile:(name: string, file: Uint8Array) => Promise<void> | void ) {
     await this.checkAuth()
     const da = await fetch('/api/assets/stream', {
         method: 'POST',
@@ -589,7 +566,7 @@ export class NodeStorage{
             pos += 32;
 
             // 파일 무결성 검증 (crypto.subtle 사용)
-            console.log(`[Debug] Verifying file: ${filename}, content length: ${content?.length}, contentLen: ${contentLen}`);
+            // console.log(`[Debug] Verifying file: ${filename}, content length: ${content?.length}, contentLen: ${contentLen}`);
             if (!content || content.length === 0) {
                 console.error(`[Error] Content is empty or undefined for file: ${filename}`);
                 throw new Error(`Content is empty for file: ${filename}`);
@@ -605,7 +582,7 @@ export class NodeStorage{
             filesProcessed++;
 
             if (onFile) {
-                onFile(filename, content);
+                await onFile(filename, content);
             }
 
             receivedBuffer = receivedBuffer.subarray(pos);
@@ -633,13 +610,20 @@ export class NodeStorage{
     async getItem(key:string):Promise<Buffer> {
         await this.checkAuth()
         
-        // database.bin은 블록 기반 동기화 사용 (RisuSave 포맷 최적화)
+        // database.bin은 블록 기반 동기화 시도 (RisuSave 포맷 최적화)
         if (key === 'database/database.bin') {
             const result = await getItemWithBlocks(key);
-            return result;
+            
+            // 블록 동기화 성공 시 반환
+            if (result !== null) {
+                return result;
+            }
+            
+            // 블록 동기화 실패 시 (초기 상태, RisuSave 아님 등) 일반 다운로드로 폴백
+            console.log(`[BlockSync] ${key}: 블록 동기화 실패 → 일반 다운로드`);
         }
         
-        // 일반 파일: 기존 해시 검증 방식
+        // 일반 파일 또는 블록 동기화 폴백: 기존 해시 검증 방식
         // IndexedDB 캐시 확인
         const cached = await getCachedNodeItem(key);
         if (cached) {
@@ -785,10 +769,10 @@ export class NodeStorage{
                             'risu-auth': input ?? ''
                         }
                     })).json()
-                    if(data.status !== 'unset'){
+                    if(data.status === 'correct'){  // FIX: !== 'unset' → === 'correct'
                         auth = input
                         localStorage.setItem('risuauth', auth)
-                        await this.checkAuth()
+                        authChecked = true  // FIX: 재귀 호출 대신 플래그 설정
                         break
                     }
                 }
