@@ -536,7 +536,7 @@ export class NodeStorage{
 
             const filenameLen = receivedBuffer.readUInt32LE(0);
             
-            if (receivedBuffer.length < 4 + filenameLen) break;
+            if (receivedBuffer.length < 4 + filenameLen + 4) break;
             
             const contentLen = receivedBuffer.readUInt32LE(4 + filenameLen);
             const totalNeeded = 4 + filenameLen + 4 + contentLen + 32;
