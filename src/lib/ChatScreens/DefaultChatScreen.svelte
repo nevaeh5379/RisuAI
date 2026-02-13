@@ -59,7 +59,7 @@
     import { stopTTS } from "src/ts/process/tts";
     import MainMenu from '../UI/MainMenu.svelte';
     import AssetInput from './AssetInput.svelte';
-    import { aiLawApplies, chatFoldedState, chatFoldedStateMessageIndex, downloadFile } from 'src/ts/globalApi.svelte';
+    import { aiLawApplies, chatFoldedState, chatFoldedStateMessageIndex, downloadFile, getFileSrc } from 'src/ts/globalApi.svelte';
     import { runTrigger } from 'src/ts/process/triggers';
     import { v4 } from 'uuid';
     import { PreUnreroll, Prereroll } from 'src/ts/process/prereroll';
