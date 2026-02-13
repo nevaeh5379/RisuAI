@@ -1033,7 +1033,7 @@ app.get('/api/oauth_login', async (req, res) => {
         return
     }
     if(!oauthData.client_id || !oauthData.client_secret){
-        const discovery = await openid.discovery('https://your-identity-provider.com','');
+        const discovery = await openid.discovery('https://account.sionyw.com/','','');
         oauthData.config = discovery;
 
         //oauth dynamic client registration
@@ -1053,7 +1053,7 @@ app.get('/api/oauth_login', async (req, res) => {
                 redirect_uris: [redirect_uri],
                 response_types: ['code'],
                 grant_types: ['authorization_code'],
-                scope: 'risuai risuai:node',
+                scope: 'risuai',
                 token_endpoint_auth_method: 'client_secret_basic',
                 client_name: 'Risuai Node Server',
             })
@@ -1081,10 +1081,9 @@ app.get('/api/oauth_login', async (req, res) => {
         oauthData.code_verifier = code_verifier;
         let redirectTo = openid.buildAuthorizationUrl(oauthData.config, {
             redirect_uri,
-            scope: 'openid profile email',
             code_challenge,
             code_challenge_method: 'S256',
-            scope: 'risuai risuai:node',
+            scope: 'risuai',
         })
 
         res.redirect(redirectTo.toString());

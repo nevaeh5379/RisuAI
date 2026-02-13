@@ -1,8 +1,8 @@
 import { get } from 'svelte/store';
 import { checkNullish, decryptBuffer, encryptBuffer, selectSingleFile } from '../util';
 import { changeLanguage, language } from '../../lang';
-import type { RisuPlugin } from '../plugins/plugins';
-import type { triggerscript as triggerscriptMain } from '../process/triggers';
+import type { RisuPlugin } from '../plugins/plugins.svelte';
+import type {triggerscript as triggerscriptMain} from '../process/triggers';
 import { downloadFile, saveAsset as saveImageGlobal } from '../globalApi.svelte';
 import { defaultAutoSuggestPrompt, defaultJailbreak, defaultMainPrompt } from './defaultPrompts';
 import { alertNormal } from '../alert';
@@ -25,7 +25,7 @@ export interface CustomAPIConfig {
 }
 
 //APP_VERSION_POINT is to locate the app version in the database file for version bumping
-export let appVer = "2026.1.90" //<APP_VERSION_POINT>
+export let appVer = "2026.2.110" //<APP_VERSION_POINT>
 export let webAppSubVer = ''
 
 
@@ -99,10 +99,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.forceReplaceUrl)) {
         data.forceReplaceUrl = ''
     }
-    if (checkNullish(data.forceReplaceUrl2)) {
-        data.forceReplaceUrl2 = ''
-    }
-    if (checkNullish(data.language)) {
+    if(checkNullish(data.language)){
         data.language = 'en'
     }
     if (checkNullish(data.swipe)) {
@@ -123,10 +120,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.zoomsize)) {
         data.zoomsize = 100
     }
-    if (checkNullish(data.lastup)) {
-        data.lastup = ''
-    }
-    if (checkNullish(data.customBackground)) {
+    if(checkNullish(data.customBackground)){
         data.customBackground = ''
     }
     if (checkNullish(data.textgenWebUIStreamURL)) {
@@ -165,10 +159,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.localBackupMethod)) {
         data.localBackupMethod = 'fast'
     }
-    if (checkNullish(data.localRestoreMethod)) {
-        data.localRestoreMethod = 'fast'
-    }
-    if (checkNullish(data.waifuWidth)) {
+    if(checkNullish(data.waifuWidth)){
         data.waifuWidth = 100
     }
     if (checkNullish(data.waifuWidth2)) {
@@ -177,10 +168,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.emotionPrompt)) {
         data.emotionPrompt = ""
     }
-    if (checkNullish(data.requester)) {
-        data.requester = "new"
-    }
-    if (checkNullish(data.proxyKey)) {
+    if(checkNullish(data.proxyKey)){
         data.proxyKey = ""
     }
     if (checkNullish(data.botPresets)) {
@@ -194,10 +182,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.sdProvider)) {
         data.sdProvider = ''
     }
-    if (checkNullish(data.runpodKey)) {
-        data.runpodKey = ''
-    }
-    if (checkNullish(data.webUiUrl)) {
+    if(checkNullish(data.webUiUrl)){
         data.webUiUrl = 'http://127.0.0.1:7860/'
     }
     if (checkNullish(data.sdSteps)) {
@@ -236,13 +221,7 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.bias)) {
         data.bias = []
     }
-    if (checkNullish(data.requestmet)) {
-        data.requestmet = 'normal'
-    }
-    if (checkNullish(data.requestproxy)) {
-        data.requestproxy = ''
-    }
-    if (checkNullish(data.showUnrecommended)) {
+    if(checkNullish(data.showUnrecommended)){
         data.showUnrecommended = false
     }
     if (checkNullish(data.elevenLabKey)) {
@@ -393,8 +372,10 @@ export function setDatabase(data: Database) {
     data.OAIPrediction ??= ''
     data.autoSuggestClean ??= true
     data.imageCompression ??= true
-    if (!data.formatingOrder.includes('personaPrompt')) {
-        data.formatingOrder.splice(data.formatingOrder.indexOf('main'), 0, 'personaPrompt')
+    data.enableBlockPartialEdit ??= false
+    data.enableDragPartialEdit ??= false
+    if(!data.formatingOrder.includes('personaPrompt')){
+        data.formatingOrder.splice(data.formatingOrder.indexOf('main'),0,'personaPrompt')
     }
     data.selectedPersona ??= 0
     data.personaPrompt ??= ''
@@ -410,8 +391,6 @@ export function setDatabase(data: Database) {
     data.ainconfig ??= safeStructuredClone(defaultAIN)
     data.openrouterKey ??= ''
     data.openrouterRequestModel ??= 'openai/gpt-3.5-turbo'
-    data.toggleConfirmRecommendedPreset ??= true
-    data.officialplugins ??= {}
     data.NAIsettings ??= safeStructuredClone(prebuiltNAIpresets)
     data.assetWidth ??= -1
     data.animationSpeed ??= 0.4
@@ -443,7 +422,6 @@ export function setDatabase(data: Database) {
     data.gptVisionQuality ??= 'low'
     data.huggingfaceKey ??= ''
     data.fishSpeechKey ??= ''
-    data.statistics ??= {}
     data.presetRegex ??= []
     data.reverseProxyOobaArgs ??= {
         mode: 'instruct'
@@ -589,7 +567,6 @@ export function setDatabase(data: Database) {
     data.showSavingIcon ??= false
     data.banCharacterset ??= []
     data.showPromptComparison ??= false
-    data.checkCorruption ??= true
     data.OaiCompAPIKeys ??= {}
     data.reasoningEffort ??= 0
     data.hypaV3Presets ??= [
@@ -610,6 +587,8 @@ export function setDatabase(data: Database) {
     data.showDeprecatedTriggerV2 ??= false
     data.returnCSSError ??= true
     data.realmDirectOpen ??= false
+    data.checkCorruption ??= false
+    data.toggleConfirmRecommendedPreset ??= false
     data.useExperimentalGoogleTranslator ??= false
     if (data.antiClaudeOverload) { //migration
         data.antiClaudeOverload = false
@@ -720,6 +699,14 @@ export function setDatabase(data: Database) {
         size: '1024x1024',
         quality: 'auto'
     }
+    data.wavespeedImage ??= {
+        key: '',
+        model: '',
+        loras: [],
+        reference_mode: '',
+        reference_image: '',
+        reference_base64image: ''
+    }
     data.autoScrollToNewMessage ??= true
     data.alwaysScrollToNewMessage ??= false
     data.newMessageButtonStyle ??= 'bottom-center'
@@ -808,7 +795,6 @@ export interface Database {
     enableLogExport: boolean
     characters: (character | groupChat)[],
     apiType: string
-    forceReplaceUrl2: string
     openAIKey: string
     proxyKey: string
     mainPrompt: string
@@ -842,51 +828,39 @@ export interface Database {
     language: string
     translator: string
     plugins: RisuPlugin[]
-    officialplugins: {
-        automark?: boolean
-        romanizer?: boolean
-        metrica?: boolean
-        oaiFix?: boolean
-        oaiFixEmdash?: boolean
-        oaiFixLetters?: boolean
-    }
     currentPluginProvider: string
-    zoomsize: number
-    lastup: string
-    customBackground: string
+    zoomsize:number
+    customBackground:string
     localBackupMethod: 'fast' | 'compatible'
-    textgenWebUIStreamURL: string
-    textgenWebUIBlockingURL: string
+    textgenWebUIStreamURL:string
+    textgenWebUIBlockingURL:string
     autoTranslate: boolean
     fullScreen: boolean
     playMessage: boolean
     iconsize: number
     theme: string
-    subModel: string
+    subModel:string
     subModel1: string
     subModel2: string
-    timeOut: number
     emotionPrompt: string,
-    requester: string
-    formatversion: number
-    waifuWidth: number
-    waifuWidth2: number
-    botPresets: botPreset[]
-    botPresetsId: number
+    formatversion:number
+    waifuWidth:number
+    waifuWidth2:number
+    botPresets:botPreset[]
+    botPresetsId:number
     sdProvider: string
-    webUiUrl: string
-    sdSteps: number
-    sdCFG: number
-    sdConfig: sdConfig
-    NAIImgUrl: string
-    NAIApiKey: string
-    NAIImgModel: string
-    NAII2I: boolean
-    NAIREF: boolean
-    NAIImgConfig: NAIImgConfig
-    ttsAutoSpeech?: boolean
-    runpodKey: string
-    promptPreprocess: boolean
+    webUiUrl:string
+    sdSteps:number
+    sdCFG:number
+    sdConfig:sdConfig
+    NAIImgUrl:string
+    NAIApiKey:string
+    NAIImgModel:string
+    NAII2I:boolean
+    NAIREF:boolean
+    NAIImgConfig:NAIImgConfig
+    ttsAutoSpeech?:boolean
+    promptPreprocess:boolean
     bias: [string, number][]
     swipe: boolean
     instantRemove: boolean
@@ -903,29 +877,25 @@ export interface Database {
     emotionPrompt2: string
     useSayNothing: boolean
     didFirstSetup: boolean
-    requestmet: string
-    requestproxy: string
-    showUnrecommended: boolean
-    elevenLabKey: string
-    voicevoxUrl: string
-    useExperimental: boolean
-    showMemoryLimit: boolean
-    roundIcons: boolean
-    useStreaming: boolean
-    palmAPI: string,
-    supaMemoryKey: string
-    hypaMemoryKey: string
-    supaModelType: string
-    textScreenColor?: string
-    textBorder?: boolean
-    textScreenRounded?: boolean
-    textScreenBorder?: string
-    characterOrder: (string | folder)[]
-    hordeConfig: hordeConfig,
-    toggleConfirmRecommendedPreset: boolean,
-    novelai: {
-        token: string,
-        model: string
+    showUnrecommended:boolean
+    elevenLabKey:string
+    voicevoxUrl:string
+    useExperimental:boolean
+    showMemoryLimit:boolean
+    roundIcons:boolean
+    useStreaming:boolean
+    supaMemoryKey:string
+    hypaMemoryKey:string
+    supaModelType:string
+    textScreenColor?:string
+    textBorder?:boolean
+    textScreenRounded?:boolean
+    textScreenBorder?:string
+    characterOrder:(string|folder)[]
+    hordeConfig:hordeConfig,
+    novelai:{
+        token:string,
+        model:string
     }
     globalscript: customscript[],
     sendWithEnter: boolean
@@ -933,20 +903,21 @@ export interface Database {
     useMonacoEditor: boolean
     monacoEditorTheme: 'vs-dark' | 'vs' | 'hc-black' | 'risu-cbs-dark'
     clickToEdit: boolean
-    koboldURL: string
-    advancedBotSettings: boolean
-    useAutoSuggestions: boolean
-    autoSuggestPrompt: string
-    autoSuggestPrefix: string
-    autoSuggestClean: boolean
-    claudeAPIKey: string,
-    useChatCopy: boolean,
-    novellistAPI: string,
-    useAutoTranslateInput: boolean
-    imageCompression: boolean
-    account?: {
-        token: string
-        id: string,
+    enableBlockPartialEdit: boolean
+    enableDragPartialEdit: boolean
+    koboldURL:string
+    useAutoSuggestions:boolean
+    autoSuggestPrompt:string
+    autoSuggestPrefix:string
+    autoSuggestClean:boolean
+    claudeAPIKey:string,
+    useChatCopy:boolean,
+    novellistAPI:string,
+    useAutoTranslateInput:boolean
+    imageCompression:boolean
+    account?:{
+        token:string
+        id:string,
         data: {
             refresh_token?: string,
             access_token?: string
@@ -1007,23 +978,19 @@ export interface Database {
         url: string,
         token: string
     }
-    localStopStrings?: string[]
-    autofillRequestUrl: boolean
-    customProxyRequestModel: string
-    generationSeed: number
-    newOAIHandle: boolean
-    putUserOpen: boolean
-    inlayImage: boolean
-    gptVisionQuality: string
-    reverseProxyOobaMode: boolean
+    localStopStrings?:string[]
+    autofillRequestUrl:boolean
+    customProxyRequestModel:string
+    generationSeed:number
+    newOAIHandle:boolean
+    gptVisionQuality:string
+    reverseProxyOobaMode:boolean
     reverseProxyOobaArgs: OobaChatCompletionRequestParams
-    tpo?: boolean
-    automark?: boolean
-    huggingfaceKey: string
-    fishSpeechKey: string
-    allowAllExtentionFiles?: boolean
-    translatorPrompt: string
-    translatorMaxResponse: number
+    huggingfaceKey:string
+    fishSpeechKey:string
+    allowAllExtentionFiles?:boolean
+    translatorPrompt:string
+    translatorMaxResponse:number
     top_p: number,
     google: {
         accessToken: string
@@ -1033,21 +1000,21 @@ export interface Database {
     chainOfThought?: boolean
     genTime: number
     promptSettings: PromptSettings
-    keiServerURL: string
+    keiServerURL:string
     statistics: {
         newYear2024?: {
             messages: number
             chats: number
         }
     },
-    top_k: number
-    repetition_penalty: number
-    min_p: number
-    top_a: number
-    claudeAws: boolean
-    lastPatchNoteCheckVersion?: string,
-    removePunctuationHypa?: boolean
-    memoryLimitThickness?: number
+    top_k:number
+    repetition_penalty:number
+    min_p:number
+    top_a:number
+    claudeAws:boolean
+    lastPatchNoteCheckVersion?:string,
+    removePunctuationHypa?:boolean
+    memoryLimitThickness?:number
     modules: RisuModule[]
     enabledModules: string[]
     sideMenuRerollButton?: boolean
@@ -1110,12 +1077,11 @@ export interface Database {
     falLoraScale: number
     moduleIntergration: string
     customCSS: string
-    betaMobileGUI: boolean
-    jsonSchemaEnabled: boolean
-    jsonSchema: string
-    strictJsonSchema: boolean
-    extractJson: string
-    ai21Key: string
+    betaMobileGUI:boolean
+    jsonSchemaEnabled:boolean
+    jsonSchema:string
+    strictJsonSchema:boolean
+    extractJson:string
     statics: {
         messages: number
         imports: number
@@ -1130,17 +1096,17 @@ export interface Database {
             outputTokens: number
         } }
     }
-    customQuotes: boolean
-    customQuotesData?: [string, string, string, string]
-    groupTemplate?: string
-    groupOtherBotRole?: string
-    customGUI: string
-    guiHTML: string
-    logShare: boolean
-    OAIPrediction: string
-    customAPIFormat: LLMFormat
-    systemContentReplacement: string
-    systemRoleReplacement: 'user' | 'assistant'
+    customQuotes:boolean
+    customQuotesData?:[string, string, string, string]
+    groupTemplate?:string
+    groupOtherBotRole?:string
+    customGUI:string
+    guiHTML:string
+    OAIPrediction:string
+    logShare:boolean
+    customAPIFormat:LLMFormat
+    systemContentReplacement:string
+    systemRoleReplacement:'user'|'assistant'
     vertexPrivateKey: string
     vertexClientEmail: string
     vertexAccessToken: string
@@ -1164,17 +1130,17 @@ export interface Database {
     enableCustomFlags: boolean
     googleClaudeTokenizing: boolean
     presetChain: string
-    legacyMediaFindings?: boolean
-    geminiStream?: boolean
-    assetMaxDifference: number
-    menuSideBar: boolean
+    legacyMediaFindings?:boolean
+    geminiStream?:boolean
+    assetMaxDifference:number
+    auxModelUnderModelSettings:boolean
+    menuSideBar:boolean
     pluginV2: RisuPlugin[]
     showSavingIcon: boolean
     presetRegex: customscript[]
-    banCharacterset: string[]
-    showPromptComparison: boolean
-    checkCorruption: boolean
-    hypaV3: boolean
+    banCharacterset:string[]
+    showPromptComparison:boolean
+    hypaV3:boolean
     hypaV3Settings: HypaV3Settings // legacy
     hypaV3Presets: HypaV3Preset[]
     hypaV3PresetId: number
@@ -1184,10 +1150,12 @@ export interface Database {
     reasoningEffort: number
     bulkEnabling: boolean
     showTranslationLoading: boolean
-    showDeprecatedTriggerV1: boolean
-    showDeprecatedTriggerV2: boolean
-    returnCSSError: boolean
-    useExperimentalGoogleTranslator: boolean
+    showDeprecatedTriggerV1:boolean
+    showDeprecatedTriggerV2:boolean
+    returnCSSError:boolean
+    checkCorruption?: boolean
+    toggleConfirmRecommendedPreset?: boolean
+    useExperimentalGoogleTranslator:boolean
     thinkingTokens: number
     antiServerOverloads: boolean
     hypaCustomSettings: {
@@ -1274,19 +1242,28 @@ export interface Database {
         size: string
         quality: string
     }
-    sourcemapTranslate: boolean
-    settingsCloseButtonSize: number
-    promptDiffPrefs: PromptDiffPrefs
+    wavespeedImage: {
+        key: string
+        model: string
+        loras: Array<{path: string, scale: number}>,
+        reference_mode: string
+        reference_image: string
+        reference_base64image: string
+    }
+    sourcemapTranslate:boolean
+    settingsCloseButtonSize:number
+    promptDiffPrefs:PromptDiffPrefs
     enableBookmark?: boolean
     hideAllImages?: boolean
     autoScrollToNewMessage?: boolean
     alwaysScrollToNewMessage?: boolean
     newMessageButtonStyle?: string
     pluginDevelopMode?: boolean
-    studioMode?: boolean
-    echoMessage?: string
-    echoDelay?: number
-    createFolderOnBranch?: boolean
+    studioMode?:boolean
+    echoMessage?:string
+    echoDelay?:number
+    createFolderOnBranch?:boolean
+    enableRemoteSaving?:boolean
     enableTypingEffect?: boolean
     typingEffectSound?: 'click' | 'sine' | 'none'
     // LoreBook+ settings
@@ -1368,7 +1345,7 @@ export interface character {
     chats: Chat[]
     chatFolders: ChatFolder[]
     chatPage: number
-    viewScreen: 'emotion' | 'none' | 'imggen' | 'vn',
+    viewScreen: 'emotion'|'none'|'imggen',
     bias: [string, number][]
     emotionImages: [string, string][]
     globalLore: loreBook[]
@@ -1648,8 +1625,7 @@ export interface botPreset {
     }
     customAPIFormat?: LLMFormat
     systemContentReplacement?: string
-    systemRoleReplacement?: 'user' | 'assistant'
-    openAIPrediction?: string
+    systemRoleReplacement?: 'user'|'assistant'
     enableCustomFlags?: boolean
     customFlags?: LLMFlags[]
     image?: string
@@ -2048,7 +2024,6 @@ export function saveCurrentPreset() {
         textgenWebUIStreamURL: db.textgenWebUIStreamURL,
         textgenWebUIBlockingURL: db.textgenWebUIBlockingURL,
         forceReplaceUrl: db.forceReplaceUrl,
-        forceReplaceUrl2: db.forceReplaceUrl2,
         promptPreprocess: db.promptPreprocess,
         bias: db.bias,
         koboldURL: db.koboldURL,
@@ -2086,7 +2061,6 @@ export function saveCurrentPreset() {
         groupTemplate: db.groupTemplate ?? '',
         seperateParametersEnabled: db.seperateParametersEnabled ?? false,
         seperateParameters: safeStructuredClone(db.seperateParameters),
-        openAIPrediction: db.OAIPrediction,
         customAPIFormat: safeStructuredClone(db.customAPIFormat),
         systemContentReplacement: db.systemContentReplacement,
         systemRoleReplacement: db.systemRoleReplacement,
@@ -2162,7 +2136,6 @@ export function setPreset(db: Database, newPres: botPreset) {
     db.textgenWebUIBlockingURL = newPres.textgenWebUIBlockingURL ?? db.textgenWebUIBlockingURL
     db.forceReplaceUrl = newPres.forceReplaceUrl ?? db.forceReplaceUrl
     db.promptPreprocess = newPres.promptPreprocess ?? db.promptPreprocess
-    db.forceReplaceUrl2 = newPres.forceReplaceUrl2 ?? db.forceReplaceUrl2
     db.bias = newPres.bias ?? db.bias
     db.koboldURL = newPres.koboldURL ?? db.koboldURL
     db.proxyKey = newPres.proxyKey ?? db.proxyKey
@@ -2218,7 +2191,6 @@ export function setPreset(db: Database, newPres: botPreset) {
         translate: {},
         otherAx: {}
     }
-    db.OAIPrediction = newPres.openAIPrediction ?? ''
     db.customAPIFormat = safeStructuredClone(newPres.customAPIFormat) ?? LLMFormat.OpenAICompatible
     db.systemContentReplacement = newPres.systemContentReplacement ?? ''
     db.systemRoleReplacement = newPres.systemRoleReplacement ?? 'user'
@@ -2345,7 +2317,7 @@ export async function importPreset(f: {
     let db = getDatabase()
     if (pre.presetVersion && pre.presetVersion >= 3) {
         //NAI preset
-        const pr = safeStructuredClone(prebuiltPresets.NAI2)
+        const pr = safeStructuredClone(prebuiltPresets.NAI)
         pr.temperature = pre.parameters.temperature * 100
         pr.maxResponse = pre.parameters.max_length
         pr.NAISettings.topK = pre.parameters.top_k

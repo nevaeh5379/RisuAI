@@ -10,12 +10,12 @@ import {
 import { changeFullscreen, checkNullish, sleep } from "./util"
 import { v4 as uuidv4 } from 'uuid';
 import { get } from "svelte/store";
-import { setDatabase, type Database, defaultSdDataFunc, getDatabase } from "./storage/database.svelte";
+import { setDatabase, defaultSdDataFunc, getDatabase } from "./storage/database.svelte";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { checkRisuUpdate } from "./update";
 import { MobileGUI, botMakerMode, selectedCharID, loadedStore, DBState, LoadingStatusState } from "./stores.svelte";
-import { loadPlugins } from "./plugins/plugins";
-import { alertError, alertMd, alertTOS, waitAlert } from "./alert";
+import { loadPlugins } from "./plugins/plugins.svelte";
+import { alertError, alertMd, alertTOS, waitAlert, alertConfirm, alertInput } from "./alert";
 import { checkDriverInit } from "./drive/drive";
 import { characterURLImport } from "./characterCards";
 import { defaultJailbreak, defaultMainPrompt, oldJailbreak, oldMainPrompt } from "./storage/defaultPrompts";
@@ -24,7 +24,6 @@ import { decodeRisuSave, encodeRisuSaveLegacy } from "./storage/risuSave";
 import { updateAnimationSpeed } from "./gui/animation";
 import { updateColorScheme, updateTextThemeAndCSS } from "./gui/colorscheme";
 import { autoServerBackup } from "./kei/backup";
-import { Capacitor } from '@capacitor/core';
 import { language } from "src/lang";
 import { startObserveDom } from "./observer.svelte";
 import { updateGuisize } from "./gui/guisize";
@@ -37,7 +36,7 @@ import {
     forageStorage,
     saveDb,
     getDbBackups,
-    getUnpargeables,
+    getUncleanables,
     getBasename,
     setUsingSw,
     checkCharOrder,
@@ -182,7 +181,7 @@ export async function loadData() {
                     return
                 }
                 LoadingStatusState.text = "Checking Service Worker..."
-                if (navigator.serviceWorker && (!Capacitor.isNativePlatform())) {
+                if (navigator.serviceWorker) {
                     setUsingSw(true)
                     await registerSw()
                 }
@@ -195,7 +194,7 @@ export async function loadData() {
             }
             LoadingStatusState.text = "Checking Unnecessary Files..."
             try {
-                await pargeChunks()
+                await cleanChunks()
             } catch (error) {
                 console.error(error)
             }
@@ -360,12 +359,60 @@ async function checkNewFormat(): Promise<void> {
         return v !== null;
     });
 
-    db.modules = (db.modules ?? []).map((v) => {
+    db.modules = await Promise.all((db.modules ?? []).map(async (v) => {
         if (v?.lorebook) {
-            v.lorebook = updateLorebooks(v.lorebook);
+            if (!Array.isArray(v.lorebook)) {
+                console.error('Critical: Invalid lorebook format detected in module');
+                console.error('Module data:', JSON.stringify(v, null, 2));
+                
+                // Alert user about corrupted data
+                alertError(language.bootstrap.dataCorruptionDetected(v.name || 'Unknown', typeof v.lorebook));
+                await waitAlert();
+                
+                // Ask if user wants to report the issue
+                const shouldReport = await alertConfirm(language.bootstrap.reportErrorQuestion);
+                
+                if (shouldReport) {
+                    try {
+                        // Collect diagnostic information (without personal data)
+                        const diagnosticInfo = {
+                            timestamp: new Date().toISOString(),
+                            moduleName: v.name || 'Unknown',
+                            lorebookType: typeof v.lorebook,
+                            lorebookValue: JSON.stringify(v.lorebook).substring(0, 500), // First 500 chars only
+                            isArray: Array.isArray(v.lorebook),
+                            keys: v.lorebook ? Object.keys(v.lorebook).join(', ') : 'N/A',
+                            formatVersion: db.formatversion || 'Unknown'
+                        };
+                        
+                        // Show the diagnostic info and allow user to copy or send
+                        const reportData = JSON.stringify(diagnosticInfo, null, 2);
+                        await alertMd(language.bootstrap.diagnosticInformation(reportData));
+                        await waitAlert();
+                        
+                        console.log('Diagnostic information for developers:', diagnosticInfo);
+                    } catch (reportError) {
+                        console.error('Failed to generate diagnostic report:', reportError);
+                    }
+                }
+                
+                // Ask if user wants to reset the data
+                const shouldReset = await alertConfirm(language.bootstrap.resetLorebookQuestion);
+                
+                if (shouldReset) {
+                    v.lorebook = [];
+                    console.log('Lorebook reset to empty array by user choice');
+                } else {
+                    console.warn('User chose to keep corrupted lorebook data');
+                }
+            } else {
+                v.lorebook = updateLorebooks(v.lorebook);
+            }
         }
         return v
-    }).filter((v) => {
+    }));
+    
+    db.modules = db.modules.filter((v) => {
         return v !== null && v !== undefined;
     });
 
@@ -377,7 +424,7 @@ async function checkNewFormat(): Promise<void> {
     });
 
     if (!db.formatversion) {
-        function checkParge(data: string) {
+        function checkClean(data: string) {
 
             if (data.startsWith('assets') || (data.length < 3)) {
                 return data
@@ -391,17 +438,17 @@ async function checkNewFormat(): Promise<void> {
             }
         }
 
-        db.customBackground = checkParge(db.customBackground);
-        db.userIcon = checkParge(db.userIcon);
+        db.customBackground = checkClean(db.customBackground);
+        db.userIcon = checkClean(db.userIcon);
 
         for (let i = 0; i < db.characters.length; i++) {
             if (db.characters[i].image) {
-                db.characters[i].image = checkParge(db.characters[i].image);
+                db.characters[i].image = checkClean(db.characters[i].image);
             }
             if (db.characters[i].emotionImages) {
                 for (let i2 = 0; i2 < db.characters[i].emotionImages.length; i2++) {
                     if (db.characters[i].emotionImages[i2] && db.characters[i].emotionImages[i2].length >= 2) {
-                        db.characters[i].emotionImages[i2][1] = checkParge(db.characters[i].emotionImages[i2][1]);
+                        db.characters[i].emotionImages[i2][1] = checkClean(db.characters[i].emotionImages[i2][1]);
                     }
                 }
             }
@@ -455,48 +502,114 @@ async function checkNewFormat(): Promise<void> {
 /**
  * Purges chunks of data that are not needed.
  */
-async function pargeChunks() {
+async function cleanChunks() {
     const db = getDatabase()
     if (db.account?.useSync) {
         return
     }
 
-    const unpargeable = new Set(getUnpargeables(db))
+    const uncleanable = new Set(getUncleanables(db))
     if (isTauri) {
         const assets = await readDir('assets', { baseDir: BaseDirectory.AppData })
         console.log(assets)
         for (const asset of assets) {
             try {
                 const n = getBasename(asset.name)
-                if (unpargeable.has(n)) {
-                    console.log('unpargeable', n)
-                }
-                else {
-                    console.log('pargeable', n)
+                if (!uncleanable.has(n)) {
                     await remove('assets/' + asset.name, { baseDir: BaseDirectory.AppData })
                 }
             } catch (error) {
                 console.log('error', asset.name)
             }
         }
+
+        const remotes = await readDir('remotes', { baseDir: BaseDirectory.AppData })
+
+        const remoteUncleanables = new Set<string>(
+            db.characters.map((v) => v.chaId)
+        )
+        for (const remote of remotes) {
+            try {
+                const name = getBasename(remote.name).slice(0, -10) //remove .local.bin
+                const fexists = remoteUncleanables.has(name)
+                if(!fexists){
+
+                    let okayToDelete = false
+                    try {
+                        const metaPath = 'remotes/' + remote.name + '.meta'
+                        const metaExists = await exists(metaPath, { baseDir: BaseDirectory.AppData })
+                        if (metaExists) {
+                            const meta = await readFile(metaPath, { baseDir: BaseDirectory.AppData })
+                            const metaJson = JSON.parse(new TextDecoder().decode(meta))
+                            const lastUsed = metaJson.lastUsed as number
+
+                            if(Date.now() - lastUsed > 1000 * 60 * 60 * 24 * 7) { //not used for 7 days
+                                okayToDelete = true
+                            }
+                        }
+                        else{
+                            //write meta for next time
+                            const metaJson = {
+                                lastUsed: Date.now()
+                            }
+                            await writeFile(metaPath, new TextEncoder().encode(JSON.stringify(metaJson)), { baseDir: BaseDirectory.AppData })
+                        }
+                    } catch (error) {}
+                    await remove('remotes/' + remote.name, { baseDir: BaseDirectory.AppData })
+                }
+            } catch (error) {
+                console.log('error', remote.name)
+            }
+        }
     }
     else {
         const indexes = await forageStorage.keys()
+        const assets = indexes.filter((asset) => asset.startsWith('assets/') && !uncleanable.has(getBasename(asset)))
+        await forageStorage.removeItemBatch(assets)
+        // 검토 필요
+        // const characterIds = new Set<string>(
+        //     db.characters.map((v) => v.chaId)
+        // )
         // for (const asset of indexes) {
-        //     if (!asset.startsWith('assets/')) {
-        //         continue
+        //     if (asset.startsWith('assets/')) {
+        //         const n = getBasename(asset)
+        //         if(!uncleanable.has(n)) {
+        //             await forageStorage.removeItem(asset)
+        //         }
         //     }
-        //     const n = getBasename(asset)
-        //     if (unpargeable.has(n)) {
-        //     }
-        //     else {
-        //         await forageStorage.removeItem(asset)
+        //     else if (asset.startsWith('remotes/')) {
+        //         const name = getBasename(asset).slice(0, -10) //remove .local.bin
+        //         const exists = characterIds.has(name)
+        //         if(!exists){
+        //             let okayToDelete = false
+        //             try {
+        //                 const metaPath = asset + '.meta'
+        //                 const metaExists = (await forageStorage.keys()).includes(metaPath)
+        //                 if (metaExists) {
+        //                     const metaData: Uint8Array = await forageStorage.getItem(metaPath) as unknown as Uint8Array
+        //                     const metaJson = JSON.parse(new TextDecoder().decode(metaData))
+        //                     const lastUsed = metaJson.lastUsed as number
+        //                     if(Date.now() - lastUsed > 1000 * 60 * 60 * 24 * 7) { //not used for 7 days
+        //                         okayToDelete = true
+        //                     }
+        //                 }
+        //                 else{
+        //                     //write meta for next time
+        //                     const metaJson = {
+        //                         lastUsed: Date.now()
+        //                     }
+        //                     await forageStorage.setItem(metaPath, new TextEncoder().encode(JSON.stringify(metaJson)))
+        //                 }
+        //             } catch (error) {}
+        //             if (okayToDelete) {
+        //                 await forageStorage.removeItem(asset)
+        //             }
+        //         }
         //     }
         // }
-        const assets = indexes.filter((asset) => asset.startsWith('assets/') && !unpargeable.has(getBasename(asset)))
-        await forageStorage.removeItemBatch(assets)
     }
 }
+
 
 /**
  * Assigns unique IDs to characters and chats.

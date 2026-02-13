@@ -333,7 +333,8 @@ export async function SaveLocalBackupLegacy(){
         }
     }
 
-    const dbData = encodeRisuSaveLegacy(getDatabase(), 'compression')
+    const dbWithoutAccount = { ...db, account: undefined }
+    const dbData = encodeRisuSaveLegacy(dbWithoutAccount, 'compression')
 
     alertWait(`Saving local Backup... (Saving database)`) 
 
@@ -531,7 +532,8 @@ export async function SavePartialLocalBackup(){
         }
     }
 
-    const dbData = encodeRisuSaveLegacy(getDatabase(), 'compression')
+    const dbWithoutAccount = { ...db, account: undefined }
+    const dbData = encodeRisuSaveLegacy(dbWithoutAccount, 'compression')
 
     alertWait(`Saving partial local backup... (Saving database)`) 
 

@@ -10,7 +10,7 @@
             <span class="text-textcolor2">You can login in app settings 🡲 account</span>
             <button onclick={async () => {
                 close()
-            }} class="text-textcolor mt-2 text-lg bg-transparent border-solid border-1 border-borderc p-4 hover:bg-green-800 transition-colors cursor-pointer">OK</button>
+            }} class="text-textcolor mt-2 text-lg bg-transparent border-solid border-1 border-borderc p-4 hover:bg-blue-800 transition-colors cursor-pointer">OK</button>
             
         {:else}
         <h1 class="font-bold text-2xl w-full">
@@ -116,7 +116,7 @@
     import TextInput from "../GUI/TextInput.svelte";
     import Button from "../GUI/Button.svelte";
     import SelectInput from "../GUI/SelectInput.svelte";
-    import { CCLicenseData } from "src/ts/creation/license";
+    import { CCLicenseData } from "src/ts/licenses";
     import OptionInput from "../GUI/OptionInput.svelte";
     import { parseMultilangString, searchTagList, sleep } from "src/ts/util";
     import MultiLangInput from "../GUI/MultiLangInput.svelte";

@@ -2,12 +2,11 @@ import { language } from "src/lang"
 import { alertClear, alertConfirm, alertError, alertModuleSelect, alertNormal, alertStore, alertWait } from "../alert"
 import { getCurrentCharacter, getCurrentChat, getDatabase, setCurrentCharacter, setDatabase, type customscript, type loreBook, type triggerscript } from "../storage/database.svelte"
 import { AppendableBuffer, downloadFile, forageStorage, readImage, saveAsset } from "../globalApi.svelte"
-import { isTauri, isNodeServer, isCapacitor } from "src/ts/platform"
 import { selectSingleFile, sleep } from "../util"
 import { v4 } from "uuid"
 import { convertExternalLorebook } from "./lorebook.svelte"
+import { compressImage } from '../media'
 import { decodeRPack, encodeRPack } from "../rpack/rpack_js"
-import { convertImage } from "../parser.svelte"
 import { HideIconStore, moduleBackgroundEmbedding, ReloadGUIPointer } from "../stores.svelte"
 import {get} from "svelte/store"
 
@@ -79,7 +78,7 @@ export async function exportModule(module:RisuModule, arg:{
         if(!rData){
             rData = new Uint8Array(0) //blank buffer
         }
-        let encoded = await encodeRPack(Buffer.from(await convertImage(rData)))
+        let encoded = await encodeRPack(Buffer.from(await compressImage(rData)))
         writeLength(encoded.length)
         apb.append(encoded)
     }

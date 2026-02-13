@@ -41,6 +41,34 @@ export const LLMModels: LLMModel[] = [
     ...AnthropicModels,
     // AWS Bedrock Claude models
     {
+        name: "Claude 4.6 Opus v1",
+        id: 'anthropic.claude-opus-4-6-v1',
+        provider: LLMProvider.AWS,
+        format: LLMFormat.AWSBedrockClaude,
+        flags: [
+            LLMFlags.hasPrefill, // actually it doesn't, but leaving it for compatibility
+            LLMFlags.hasImageInput,
+            LLMFlags.hasFirstSystemPrompt,
+            LLMFlags.claudeThinking
+        ],
+        parameters: [...ClaudeParameters, 'thinking_tokens'],
+        tokenizer: LLMTokenizer.Claude,
+    },
+    {
+        name: "Claude 4.5 Opus (20251101) v1",
+        id: 'anthropic.claude-opus-4-5-20251101-v1:0',
+        provider: LLMProvider.AWS,
+        format: LLMFormat.AWSBedrockClaude,
+        flags: [
+            LLMFlags.hasPrefill,
+            LLMFlags.hasImageInput,
+            LLMFlags.hasFirstSystemPrompt,
+            LLMFlags.claudeThinking
+        ],
+        parameters: [...ClaudeParameters, 'thinking_tokens'],
+        tokenizer: LLMTokenizer.Claude
+    },
+    {
         name: 'Claude 4.5 Sonnet (20250929) v1',
         id: 'anthropic.claude-sonnet-4-5-20250929-v1:0',
         provider: LLMProvider.AWS,
@@ -531,9 +559,23 @@ for(let i=0; i<LLMModels.length; i++){
     }
 }
 
-export function getModelInfo(id: string): LLMModel{
+export function getModelInfo(id?: string | null): LLMModel{
 
     const db = getDatabase()
+    if(!id){
+        return {
+            id: '',
+            name: 'Unknown',
+            shortName: 'Unknown',
+            fullName: 'Unknown',
+            internalID: '',
+            provider: LLMProvider.AsIs,
+            format: LLMFormat.OpenAICompatible,
+            flags: [],
+            parameters: OpenAIParameters,
+            tokenizer: LLMTokenizer.Unknown
+        }
+    }
     const found:LLMModel = safeStructuredClone(LLMModels.find(model => model.id === id))
 
     if(found){

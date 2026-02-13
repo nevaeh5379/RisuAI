@@ -133,10 +133,6 @@ export const advancedSettingsItems: SettingItem[] = [
 
     // Experimental Section (visible when useExperimental is true)
     {
-        id: 'adv.exp.randomUser', type: 'check', labelKey: 'oaiRandomUser', bindKey: 'putUserOpen',
-        condition: (ctx) => ctx.db.useExperimental, showExperimental: true, helpKey: 'oaiRandomUser', classes: 'mt-4'
-    },
-    {
         id: 'adv.exp.googleToken', type: 'check', labelKey: 'googleCloudTokenization', bindKey: 'googleClaudeTokenizing',
         condition: (ctx) => ctx.db.useExperimental, showExperimental: true, classes: 'mt-4'
     },
@@ -169,10 +165,12 @@ export const advancedSettingsItems: SettingItem[] = [
         id: 'adv.promptTextInfo', type: 'check', labelKey: 'promptTextInfoInsideChat', bindKey: 'promptTextInfoInsideChat',
         condition: (ctx) => (isNodeServer || isTauri) && ctx.db.promptInfoInsideChat, classes: 'mt-4'
     },
+    {
+        id: 'adv.remoteSave', type: 'check', labelKey: 'enableRemoteSaving', bindKey: 'enableRemoteSaving',
+    },
 
     // Dynamic Assets & Others
     { id: 'adv.dynAssets', type: 'check', labelKey: 'dynamicAssets', bindKey: 'dynamicAssets', helpKey: 'dynamicAssets', classes: 'mt-4' },
-    { id: 'adv.checkCorr', type: 'check', labelKey: 'checkCorruption', bindKey: 'checkCorruption', classes: 'mt-4' },
     { id: 'adv.realmOpen', type: 'check', labelKey: 'realmDirectOpen', bindKey: 'realmDirectOpen', helpKey: 'realmDirectOpen', classes: 'mt-4' },
     { id: 'adv.cssErr', type: 'check', labelKey: 'returnCSSError', bindKey: 'returnCSSError', classes: 'mt-4' },
     { id: 'adv.antiOverload', type: 'check', labelKey: 'antiServerOverload', bindKey: 'antiServerOverloads', classes: 'mt-4' },
@@ -196,6 +194,7 @@ export const advancedSettingsItems: SettingItem[] = [
         },
         classes: 'mt-2'
     },
+    { id: 'adv.auxModelUnderModelSettings', type: 'check', labelKey: 'auxModelUnderModelSettings', bindKey: 'auxModelUnderModelSettings', classes: 'mt-4' },
     { id: 'adv.devMode', type: 'check', labelKey: 'pluginDevelopMode', bindKey: 'pluginDevelopMode', classes: 'mt-4' },
 
     // More Experimental (Condition: useExperimental)
@@ -234,5 +233,4 @@ export const advancedSettingsItems: SettingItem[] = [
     { type: 'custom', id: 'adv.banChar', componentId: 'BanCharacterSetSettings' },
     { type: 'custom', id: 'adv.customModels', componentId: 'CustomModelsSettings' },
     { type: 'custom', id: 'adv.export', componentId: 'SettingsExportButtons' },
-    { type: 'custom', id: 'adv.storage', componentId: 'StorageInvestigationSettings' }
 ];

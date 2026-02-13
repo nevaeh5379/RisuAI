@@ -5,7 +5,7 @@
     import Help from "src/lib/Others/Help.svelte";
     
     import { DBState } from 'src/ts/stores.svelte';
-    import { customProviderStore } from "src/ts/plugins/plugins";
+    import { customProviderStore } from "src/ts/plugins/plugins.svelte";
     import { downloadFile } from "src/ts/globalApi.svelte";
     import { isTauri } from "src/ts/platform"
     import { tokenizeAccurate, tokenizerList } from "src/ts/tokenizer";
@@ -19,7 +19,7 @@
     import Button from "src/lib/UI/GUI/Button.svelte";
     import SelectInput from "src/lib/UI/GUI/SelectInput.svelte";
     import OptionInput from "src/lib/UI/GUI/OptionInput.svelte";
-    import { openRouterModels } from "src/ts/model/openrouter";
+    import { getOpenRouterModels } from "src/ts/model/openrouter";
     import OobaSettings from "./OobaSettings.svelte";
     import Accordion from "src/lib/UI/Accordion.svelte";
     import OpenrouterSettings from "./OpenrouterSettings.svelte";
@@ -27,14 +27,14 @@
     import PromptSettings from "./PromptSettings.svelte";
     import { openPresetList } from "src/ts/stores.svelte";
     import { selectSingleFile } from "src/ts/util";
-  import { getModelInfo, LLMFlags, LLMFormat, LLMProvider } from "src/ts/model/modellist";
-  import CheckInput from "src/lib/UI/GUI/CheckInput.svelte";
-  import RegexList from "src/lib/SideBars/Scripts/RegexList.svelte";
+    import { getModelInfo, LLMFlags, LLMFormat, LLMProvider } from "src/ts/model/modellist";
+    import RegexList from "src/lib/SideBars/Scripts/RegexList.svelte";
     import SettingRenderer from "../SettingRenderer.svelte";
     import { allBasicParameterItems } from "src/ts/setting/botSettingsParamsData";
     import SeparateParametersSection from "./SeparateParametersSection.svelte";
+    import AuxModelSelectors from './Model/AuxModelSelectors.svelte'
     
-let tokens = $state({
+    let tokens = $state({
         mainPrompt: 0,
         jailbreak: 0,
         globalNote: 0,
@@ -68,7 +68,7 @@ let tokens = $state({
 
     $effect(() => {
         if (DBState.db.aiModel === 'openrouter' || DBState.db.subModel === 'openrouter') {
-            openrouterSearchQuery = ""
+            openRouterSearchQuery = ""
         }
     });
 
@@ -76,9 +76,9 @@ let tokens = $state({
     let submenu = $state(DBState.db.useLegacyGUI ? -1 : 0)
     let modelInfo = $derived(getModelInfo(DBState.db.aiModel))
     let subModelInfo = $derived(getModelInfo(DBState.db.subModel))
+    let openRouterSearchQuery = $state("")
     let subModelInfo1 = $derived(getModelInfo(DBState.db.subModel1))
     let subModelInfo2 = $derived(getModelInfo(DBState.db.subModel2))
-    let openrouterSearchQuery = $state("")
 </script>
 <h2 class="mb-2 text-2xl font-bold mt-2">{language.chatBot}</h2>
 
@@ -146,10 +146,6 @@ let tokens = $state({
                 us-west1
             </OptionInput>
         </SelectInput>    
-    {/if}
-    {#if modelInfo.provider === LLMProvider.AI21 || subModelInfo.provider === LLMProvider.AI21}
-        <span class="text-textcolor">AI21 {language.apiKey}</span>
-        <TextInput hideText={DBState.db.hideApiKey} marginBottom={true} size={"sm"} placeholder="..." bind:value={DBState.db.ai21Key}/>
     {/if}
     {#if modelInfo.provider === LLMProvider.NovelList || subModelInfo.provider === LLMProvider.NovelList}
         <span class="text-textcolor">NovelList {language.apiKey}</span>
@@ -364,40 +360,36 @@ let tokens = $state({
         <TextInput marginBottom={false} size={"sm"} bind:value={DBState.db.ollamaModel} />
     {/if}
     {#if DBState.db.aiModel === 'openrouter' || DBState.db.subModel === 'openrouter'}
-        <span class="text-textcolor mt-4">Openrouter Key</span>
+        <span class="text-textcolor mt-4">OpenRouter {language.apiKey}</span>
         <TextInput hideText={DBState.db.hideApiKey} marginBottom={false} size={"sm"} bind:value={DBState.db.openrouterKey} />
 
-        <span class="text-textcolor mt-4">Openrouter Model</span>
-        {#await openRouterModels()}
+        <span class="text-textcolor mt-4">OpenRouter {language.model}</span>
+        {#await getOpenRouterModels()}
             <SelectInput className="mt-2 mb-4" value="">
-                <OptionInput value="">Loading..</OptionInput>
+                <OptionInput value="">Loading...</OptionInput>
             </SelectInput>
         {:then m}
             {#if m && m.length > 0}
                 <TextInput 
-                    bind:value={openrouterSearchQuery} 
-                    placeholder="Search models..." 
+                    bind:value={openRouterSearchQuery} 
+                    placeholder={language.openRouterSearchModel}
                     size="sm" 
                 />
             {/if}
             <SelectInput className="mt-2 mb-4" bind:value={DBState.db.openrouterRequestModel}>
-                {#if (!m) || (m.length === 0)}
-                    <OptionInput value="openai/gpt-3.5-turbo">GPT 3.5</OptionInput>
-                    <OptionInput value="openai/gpt-3.5-turbo-16k">GPT 3.5 16k</OptionInput>
-                    <OptionInput value="openai/gpt-4">GPT-4</OptionInput>
-                    <OptionInput value="openai/gpt-4-32k">GPT-4 32k</OptionInput>
-                    <OptionInput value="anthropic/claude-2">Claude 2</OptionInput>
-                    <OptionInput value="anthropic/claude-instant-v1">Claude Instant v1</OptionInput>
-                    <OptionInput value="anthropic/claude-instant-v1-100k">Claude Instant v1 100k</OptionInput>
-                    <OptionInput value="anthropic/claude-v1">Claude v1</OptionInput>
-                    <OptionInput value="anthropic/claude-v1-100k">Claude v1 100k</OptionInput>
-                    <OptionInput value="anthropic/claude-1.2">Claude v1.2</OptionInput>
+                {#if !m || (m.length === 0)}
+                    <OptionInput value="risu/free">Free Auto</OptionInput>
+                    <OptionInput value="openai/gpt-5.2">GPT 5.2</OptionInput>
+                    <OptionInput value="anthropic/claude-sonnet-4.5">Claude Sonnet 4.5</OptionInput>
+                    <OptionInput value="anthropic/claude-opus-4.5">Claude Opus 4.5</OptionInput>
+                    <OptionInput value="google/gemini-3-flash-preview">Google Gemini 3 Flash Preview</OptionInput>
+                    <OptionInput value="google/gemini-3-pro-preview">Google Gemini 3 Pro Preview</OptionInput>
                 {:else}
-                    <OptionInput value={"risu/free"}>Free Auto</OptionInput>
-                    <OptionInput value={"openrouter/auto"}>Openrouter Auto</OptionInput>
+                    <OptionInput value="risu/free">Free Auto</OptionInput>
+                    <OptionInput value="openrouter/auto">OpenRouter Auto</OptionInput>
                     {#each m.filter(model => {
-                        if (openrouterSearchQuery === "") return true;
-                        const searchTerms = openrouterSearchQuery.toLowerCase().trim().split(/\s+/);
+                        if (openRouterSearchQuery === "") return true;
+                        const searchTerms = openRouterSearchQuery.trim().toLowerCase().split(/\s+/);
                         const modelText = (model.name + " " + model.id).toLowerCase();
                         return searchTerms.every(term => modelText.includes(term));
                     }) as model}
@@ -465,7 +457,6 @@ let tokens = $state({
     {#if DBState.db.aiModel === "kobold" || DBState.db.subModel === "kobold"}
         <span class="text-textcolor">Kobold URL</span>
         <TextInput marginBottom={true} bind:value={DBState.db.koboldURL} />
-
     {/if}
 
     {#if DBState.db.aiModel === 'echo_model' || DBState.db.subModel === 'echo_model'}
@@ -474,7 +465,6 @@ let tokens = $state({
         <span class="text-textcolor mt-2">Echo Delay (Seconds)</span>
         <NumberInput marginBottom={true} bind:value={DBState.db.echoDelay} min={0}/>
     {/if}
-
 
     {#if DBState.db.aiModel.startsWith("horde") || DBState.db.subModel.startsWith("horde") }
         <span class="text-textcolor">Horde {language.apiKey}</span>
@@ -498,6 +488,10 @@ let tokens = $state({
     {/if}
     {#if DBState.db.aiModel.startsWith("horde") || DBState.db.aiModel === 'kobold' }
         <ChatFormatSettings />
+    {/if}
+
+    {#if DBState.db.auxModelUnderModelSettings}
+        <AuxModelSelectors />
     {/if}
 {/if}
 
@@ -634,7 +628,6 @@ let tokens = $state({
 
     <!-- Separate Parameters - handled by custom component -->
     <SeparateParametersSection />
-
 {/if}
 
 {#if submenu === 3 || submenu === -1}

@@ -3,9 +3,9 @@ import { applyParameters, setObjectValue, type OpenAIChatExtra, type OpenAIConte
 import { getDatabase } from "src/ts/storage/database.svelte"
 import { LLMFlags, LLMFormat } from "src/ts/model/modellist"
 import { strongBan, tokenizeNum } from "src/ts/tokenizer"
-import { getFreeOpenRouterModel } from "src/ts/model/openrouter"
+import { getFreeOpenRouterModels } from "src/ts/model/openrouter"
 import { addFetchLog, fetchNative, globalFetch, textifyReadableStream } from "src/ts/globalApi.svelte"
-import { isTauri, isNodeServer, isCapacitor } from "src/ts/platform"
+import { isTauri, isNodeServer } from "src/ts/platform"
 import type { OpenAIChatFull } from "../index.svelte"
 import { extractJSON, getOpenAIJSONSchema } from "../templates/jsonSchema"
 import { applyChatTemplate } from "../templates/chatTemplate"
@@ -223,7 +223,7 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
     }
 
     if(aiModel === 'openrouter' && db.openrouterRequestModel === 'risu/free'){
-        openrouterRequestModel = await getFreeOpenRouterModel()
+        openrouterRequestModel = await getFreeOpenRouterModels()
     }
 
     if(arg.modelInfo.flags.includes(LLMFlags.DeveloperRole)){
@@ -536,10 +536,6 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
     if(risuIdentify){
         headers["X-Proxy-Risu"] = 'RisuAI'
     }
-    if(aiModel.startsWith('jamba')){
-        headers['Authorization'] = 'Bearer ' + db.ai21Key
-        replacerURL = 'https://api.ai21.com/studio/v1/chat/completions'
-    }
     if(arg.multiGen){
         // Check if tools are enabled - multiGen with tools is not supported
         if(arg.tools && arg.tools.length > 0){
@@ -550,7 +546,6 @@ export async function requestOpenAI(arg:RequestDataArgumentExtended):Promise<req
         }
         body.n = db.genTime
     }
-    let throughProxi = (!isTauri) && (!isNodeServer) && (!db.usePlainFetch) && (!isCapacitor)
     if(arg.useStreaming){
         body.stream = true
         let urlHost = new URL(replacerURL).host

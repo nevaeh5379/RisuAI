@@ -57,33 +57,25 @@
     import { processScript } from "src/ts/process/scripts";
     import CreatorQuote from "./CreatorQuote.svelte";
     import { stopTTS } from "src/ts/process/tts";
-    import MainMenu from "../UI/MainMenu.svelte";
-    import AssetInput from "./AssetInput.svelte";
-    import {
-        aiLawApplies,
-        chatFoldedState,
-        chatFoldedStateMessageIndex,
-        downloadFile,
-        getFileSrc,
-    } from "src/ts/globalApi.svelte";
-    import { runTrigger } from "src/ts/process/triggers";
-    import { v4 } from "uuid";
-    import { PreUnreroll, Prereroll } from "src/ts/process/prereroll";
-    import { processMultiCommand } from "src/ts/process/command";
-    import { postChatFile } from "src/ts/process/files/multisend";
-    import { getInlayAsset } from "src/ts/process/files/inlays";
-    import PlaygroundMenu from "../Playground/PlaygroundMenu.svelte";
-    import { ConnectionOpenStore } from "src/ts/sync/multiuser";
-    import {
-        coldStorageHeader,
-        preLoadChat,
-    } from "src/ts/process/coldstorage.svelte";
-    import Chats from "./Chats.svelte";
-    import Button from "../UI/GUI/Button.svelte";
-    import PluginDefinedIcon from "../Others/PluginDefinedIcon.svelte";
+    import MainMenu from '../UI/MainMenu.svelte';
+    import AssetInput from './AssetInput.svelte';
+    import { aiLawApplies, chatFoldedState, chatFoldedStateMessageIndex, downloadFile } from 'src/ts/globalApi.svelte';
+    import { runTrigger } from 'src/ts/process/triggers';
+    import { v4 } from 'uuid';
+    import { PreUnreroll, Prereroll } from 'src/ts/process/prereroll';
+    import { processMultiCommand } from 'src/ts/process/command';
+    import { postChatFile } from 'src/ts/process/files/multisend';
+    import { getInlayAsset } from 'src/ts/process/files/inlays';
+    import PlaygroundMenu from '../Playground/PlaygroundMenu.svelte';
+    import { ConnectionOpenStore } from 'src/ts/sync/multiuser';
+    import { coldStorageHeader, preLoadChat } from 'src/ts/process/coldstorage.svelte';
+    import Chats from './Chats.svelte';
+    import Button from '../UI/GUI/Button.svelte';
+    import PluginDefinedIcon from '../Others/PluginDefinedIcon.svelte';
     import { changeUserPersona } from "src/ts/persona";
     import ListedPersona from "../Setting/listedPersona.svelte";
-
+    const loadPlaygroundMenu = () => import('../Playground/PlaygroundMenu.svelte').then(m => m.default);
+    
     interface Props {
         openModuleList?: boolean;
         openChatList?: boolean;
@@ -745,7 +737,9 @@
         {#if $PlaygroundStore === 0}
             <MainMenu />
         {:else}
-            <PlaygroundMenu />
+            {#await loadPlaygroundMenu() then PlaygroundMenu}
+                <PlaygroundMenu />
+            {/await}
         {/if}
     {:else}
         <div

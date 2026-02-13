@@ -75,7 +75,9 @@
     import AutoresizeArea from "../UI/GUI/TextAreaResizable.svelte";
     import ChatBody from "./ChatBody.svelte";
     import PopupButton from "../UI/PopupButton.svelte";
-    import MessageContextMenu from "../UI/MessageContextMenu.svelte";
+    import MessageContextMenu from "../UI/MessageContextMenu.svelte"; 
+    import PartialEditController from './PartialEditController.svelte';
+
     import { rangeSelectionStore } from "src/ts/stores.svelte";
 
     let translating = $state(false);
@@ -137,8 +139,9 @@
         disabled = false,
     }: Props = $props();
 
-    let msgDisplay = $state("");
-    let translated = $state(false);
+    let msgDisplay = $state('')
+    let translated = $state(false)
+    let partialEditEnabled = $state(true)
 
     async function rm(e: MouseEvent, rec?: boolean) {
         if (e.shiftKey) {
@@ -184,13 +187,18 @@
         }
     }
 
-    async function edit() {
-        DBState.db.characters[selIdState.selId].chats[
-            DBState.db.characters[selIdState.selId].chatPage
-        ].message[idx].data = message;
+    async function edit(){
+        DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = message
     }
 
-    // Context menu handlers
+    function handlePartialEditSave(e: CustomEvent<{ newData: string }>) {
+        if (idx >= 0) {
+            message = e.detail.newData
+            DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = e.detail.newData
+            displaya(e.detail.newData)
+        }
+    }
+
     function openContextMenu(e: MouseEvent | TouchEvent, fromLongpress = false) {
         if (idx < 0) return;
         
@@ -261,6 +269,22 @@
         DBState.db.characters[selIdState.selId].chats[
             DBState.db.characters[selIdState.selId].chatPage
         ].message[idx].disabled = !currentMessage.disabled;
+    }
+
+    function getCbsCondition(){
+        try{
+            const cbsConditions:CbsConditions = {
+                firstmsg: firstMessage ?? false,
+                chatRole: DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage]?.message?.[idx]?.role ?? null,
+            }
+            return cbsConditions
+        }
+        catch(e){
+            return {
+                firstmsg: firstMessage ?? false,
+                chatRole: null,
+            }
+        }
     }
 
     function handleContextMenuDisableAbove() {
@@ -431,23 +455,23 @@
     let isRangeStart = $derived(rangeSelectionStore.active && idx === rangeSelectionStore.startIndex);
     let isRangeEnd = $derived(rangeSelectionStore.active && rangeSelectionStore.endIndex >= 0 && idx === rangeSelectionStore.endIndex);
 
-    function getCbsCondition() {
-        try {
-            const cbsConditions: CbsConditions = {
-                firstmsg: firstMessage ?? false,
-                chatRole:
-                    DBState.db.characters[selIdState.selId].chats[
-                        DBState.db.characters[selIdState.selId].chatPage
-                    ]?.message?.[idx]?.role ?? null,
-            };
-            return cbsConditions;
-        } catch (e) {
-            return {
-                firstmsg: firstMessage ?? false,
-                chatRole: null,
-            };
-        }
-    }
+    // function getCbsCondition() {
+    //     try {
+    //         const cbsConditions: CbsConditions = {
+    //             firstmsg: firstMessage ?? false,
+    //             chatRole:
+    //                 DBState.db.characters[selIdState.selId].chats[
+    //                     DBState.db.characters[selIdState.selId].chatPage
+    //                 ]?.message?.[idx]?.role ?? null,
+    //         };
+    //         return cbsConditions;
+    //     } catch (e) {
+    //         return {
+    //             firstmsg: firstMessage ?? false,
+    //             chatRole: null,
+    //         };
+    //     }
+    // }
 
     function displaya(message: string) {
         msgDisplay = risuChatParser(message, {
@@ -587,9 +611,8 @@
         } else {
             chat.bookmarks.push(messageId);
 
-            const msgSender =
-                chat.message[idx]?.role === "user" ? getUserName() : name;
-            const newName = await alertInput(language.bookmarkAskNameOrDefault);
+            const msgSender = chat.message[idx]?.role === 'user' ? getUserName() : name;
+            const newName= await alertInput(language.bookmarkAskNameOrDefault, [], chat.bookmarkNames[messageId] || '');
 
             if (newName && newName.trim() !== "") {
                 chat.bookmarkNames[messageId] = newName;
@@ -768,6 +791,16 @@
                     bind:retranslate
                 />
             {/key}
+            {#if idx >= 0 && !editMode && partialEditEnabled && (DBState.db.enableBlockPartialEdit || DBState.db.enableDragPartialEdit)}
+                <PartialEditController
+                    messageData={message}
+                    chatIndex={idx}
+                    {bodyRoot}
+                    blockEditEnabled={DBState.db.enableBlockPartialEdit}
+                    dragEditEnabled={DBState.db.enableDragPartialEdit}
+                    on:save={handlePartialEditSave}
+                />
+            {/if}
         </span>
     {/if}
 {/snippet}
