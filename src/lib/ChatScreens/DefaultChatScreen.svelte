@@ -659,9 +659,6 @@
 <div
     class="w-full h-full relative"
     style={customStyle}
-    onclick={() => {
-        openMenu = false;
-    }}
 >
     {#if showNewMessageButton}
         {#if DBState.db.newMessageButtonStyle === "bottom-center" || !DBState.db.newMessageButtonStyle}
@@ -743,46 +740,43 @@
         {/if}
     {:else}
         <div
-            class="h-full w-full flex flex-col-reverse overflow-y-auto relative default-chat-screen"
-            onscroll={(e) => {
-                //@ts-expect-error scrollHeight/clientHeight/scrollTop don't exist on EventTarget, but target is HTMLElement here
-                const scrolled =
-                    e.target.scrollHeight -
-                    e.target.clientHeight +
-                    e.target.scrollTop;
-                if (
-                    scrolled < 100 &&
-                    DBState.db.characters[$selectedCharID].chats[
-                        DBState.db.characters[$selectedCharID].chatPage
-                    ].message.length > loadPages
-                ) {
-                    loadPages += 15;
-                }
-                const chatTarget = e.target as HTMLElement;
-                const chatsContainer =
-                    DBState.db.fixedChatTextarea && chatTarget.children[1]
-                        ? chatTarget.children[1]
-                        : chatTarget.children[0];
-                const lastEl = chatsContainer?.firstElementChild;
-                const isAtBottom = lastEl
-                    ? lastEl.getBoundingClientRect().top <=
-                      chatTarget.getBoundingClientRect().bottom + 100
-                    : true;
-                if (isAtBottom) {
-                    showNewMessageButton = false;
-                }
-            }}
-        >
+    class="h-full w-full flex flex-col-reverse overflow-y-auto relative default-chat-screen"
+    onscroll={(e: Event) => {
+        const target = e.target as HTMLElement;
+        const scrolled = target.scrollHeight - target.clientHeight + target.scrollTop;
+        
+        if (
+            scrolled < 100 &&
+            DBState.db.characters[$selectedCharID].chats[
+                DBState.db.characters[$selectedCharID].chatPage
+            ].message.length > loadPages
+        ) {
+            loadPages += 15;
+        }
+        
+        const chatsContainer =
+            DBState.db.fixedChatTextarea && target.children[1]
+                ? target.children[1]
+                : target.children[0];
+        const lastEl = chatsContainer?.firstElementChild;
+        const isAtBottom = lastEl
+            ? lastEl.getBoundingClientRect().top <=
+              target.getBoundingClientRect().bottom + 100
+            : true;
+        if (isAtBottom) {
+            showNewMessageButton = false;
+        }
+    }}
+>
             <div
                 class="{DBState.db.fixedChatTextarea
                     ? 'sticky pt-2 pb-2 right-0 bottom-0 bg-bgcolor'
                     : 'mt-2 mb-2'} w-full"
                 style="{DBState.db.fixedChatTextarea ? 'z-index:29;' : ''}"
             >
+ 
                 <div class="flex flex-col mx-4" style="width: calc(100% - 2rem);">
-                    <!-- Suggestion: position absolute 제거, 일반 flow 배치하여 높이 차지 -->
-                    <!-- -mb-1로 아래 요소(채팅창)와 약간 겹치게 하여 연결된 느낌 및 뒤로 숨김 효과 -->
-                    <!-- px-2 제거: 너비를 채팅창과 동일하게 맞춤 -->
+                    {#if DBState.db.useAutoSuggestions}
                     <div class="relative w-full z-0 -mb-2">
                         <Suggestion
                             messageInput={(msg) =>
@@ -796,7 +790,7 @@
                             {send}
                         />
                     </div>
-
+                    {/if}
                     <!-- Persona Selector - 입력창 위에 현재 페르소나 표시 -->
                     <button
                         class="flex items-center gap-2 px-2 py-1 mb-1 rounded-md hover:bg-selected transition-colors text-textcolor text-sm w-fit"
@@ -827,14 +821,14 @@
                     <!-- rounded-md 추가: 컨테이너 배경이 둥근 버튼 뒤에서 직각으로 튀어나오는 것 방지 -->
                     <div class="flex items-stretch relative z-10 bg-bgcolor w-full rounded-md mt-1">
                 {#if DBState.db.useChatSticker && currentCharacter.type !== "group"}
-                    <div
+                    <button
                         onclick={() => {
                             toggleStickers = !toggleStickers;
                         }}
                         class={"bg-textcolor2 flex justify-center items-center w-12 h-12 rounded-l-md border border-r-0 border-darkborderc hover:bg-green-500 transition-colors " + (toggleStickers ? "text-green-500" : "text-textcolor")}
                     >
                         <Laugh />
-                    </div>
+                    </button>
                 {/if}
 
                 {#if !DBState.db.useAdvancedEditor}

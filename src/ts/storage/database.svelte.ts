@@ -153,9 +153,9 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.subModel2)) {
         data.subModel2 = 'gemini-3-flash-preview'
     }
-    if (checkNullish(data.timeOut)) {
-        data.timeOut = 120
-    }
+    // if (checkNullish(data.timeOut)) {
+    //     data.timeOut = 120
+    // }
     if (checkNullish(data.localBackupMethod)) {
         data.localBackupMethod = 'fast'
     }
@@ -673,9 +673,9 @@ export function setDatabase(data: Database) {
     if (checkNullish(data.studioMode)) {
         data.studioMode = false
     }
-    if (checkNullish(data.studioLayout)) {
-        data.studioLayout = false
-    }
+    // if (checkNullish(data.studioLayout)) {
+    //     data.studioLayout = false
+    // }
     //@ts-expect-error __TAURI_INTERNALS__ is injected by Tauri runtime, not defined in Window interface
     if (!globalThis.__NODE__ && !window.__TAURI_INTERNALS__) {
         //this is intended to forcely reduce the size of the database in web
