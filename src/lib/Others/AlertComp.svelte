@@ -83,6 +83,16 @@
         void loadDetailedOSLabel();
     });
 
+    $effect(() => {
+        if (
+            $alertStore.type === 'requestdata'
+            && generationInfoMenuIndex === 4
+            && !$alertGenerationInfoStore.genInfo.agentGraphTrace?.length
+        ) {
+            generationInfoMenuIndex = 0
+        }
+    });
+
     function highlightJson(code: string): string {
         try {
             return hljs.highlight(code, { language: 'json' }).value
@@ -426,6 +436,11 @@
                     <Button selected={generationInfoMenuIndex === 3} size="sm" onclick={() => {generationInfoMenuIndex = 3}}>
                         {language.prompt}
                     </Button>
+                    {#if $alertGenerationInfoStore.genInfo.agentGraphTrace?.length}
+                        <Button selected={generationInfoMenuIndex === 4} size="sm" onclick={() => {generationInfoMenuIndex = 4}}>
+                            Agents
+                        </Button>
+                    {/if}
                     <button class="ml-auto" onclick={() => {
                         alertStore.set({
                             type: 'none',
@@ -547,6 +562,40 @@
                             </div>
                         </div>
                     {/if}
+                {/if}
+                {#if generationInfoMenuIndex === 4}
+                    <div class="mt-4 flex max-h-96 w-full flex-col gap-2 overflow-y-auto">
+                        {#each $alertGenerationInfoStore.genInfo.agentGraphTrace ?? [] as entry}
+                            <div class="rounded-md border border-darkborderc bg-darkbg/40 p-3">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-sm text-textcolor">{entry.nodeName ?? entry.nodeId}</div>
+                                        {#if entry.nodeName && entry.nodeName !== entry.nodeId}
+                                            <div class="truncate font-mono text-[11px] text-textcolor2">{entry.nodeId}</div>
+                                        {/if}
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs text-textcolor2">
+                                        <span
+                                            class:text-textcolor={entry.status === 'success'}
+                                            class:text-textcolor2={entry.status === 'skipped'}
+                                            class:text-draculared={entry.status === 'failed'}
+                                        >{entry.status}</span>
+                                        <span>{entry.durationMs} ms</span>
+                                        {#if entry.model}<span>{entry.model}</span>{/if}
+                                    </div>
+                                </div>
+                                {#if entry.condition}
+                                    <div class="mt-2 font-mono text-xs text-textcolor2">Condition: {entry.condition} → {entry.conditionPassed ? 'true' : 'false'}</div>
+                                {/if}
+                                {#if entry.error}
+                                    <div class="mt-2 whitespace-pre-wrap text-xs text-draculared">{entry.error}</div>
+                                {/if}
+                                {#if entry.outputPreview}
+                                    <pre class="mt-2 max-h-32 overflow-auto whitespace-pre-wrap rounded border border-darkborderc bg-bgcolor p-2 text-xs text-textcolor2">{entry.outputPreview}</pre>
+                                {/if}
+                            </div>
+                        {/each}
+                    </div>
                 {/if}
             {:else if $alertStore.type === 'hypaV2'}
                 <div class="flex flex-wrap gap-2 mb-4 max-w-full w-124">

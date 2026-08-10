@@ -33,6 +33,15 @@ import { hypaMemoryV3 } from "./memory/hypav3";
 import { getModuleAssets, getModuleToggles } from "./modules";
 import { readImage } from "../globalApi.svelte";
 import { pluginV2 } from "../plugins/plugins.svelte";
+import {
+    AgentGraphSession,
+    formatAgentGraphGuidance,
+    summarizeAgentGraphTrace,
+    type AgentGraph,
+    type GraphModelExecutionResult,
+} from "./agentGraph";
+import { createRisuAgentGraphSession } from "./agentGraphRuntime";
+import type { PromptRole } from "./prompt";
 
 export interface OpenAIChat{
     role: 'system'|'user'|'assistant'|'function'
@@ -1158,6 +1167,9 @@ export async function sendChat(chatProcessIndex = -1,arg:{
     })
 
     let memories:OpenAIChat[] = []
+    const agentPromptMemories = chats
+        .filter((message) => message.memo === 'supaMemory' || message.memo === 'hypaMemory')
+        .map((message) => safeStructuredClone(message))
 
 
 
@@ -1497,6 +1509,81 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         promptInfo.promptText = promptBodyformatedForChatStore
     }
 
+    let activeAgentGraph:AgentGraph|undefined
+    let agentGraphSession:AgentGraphSession|undefined
+    if(DBState.db.subAgentGraph?.enabled && !arg.preview && !arg.previewPrompt){
+        try {
+            activeAgentGraph = safeStructuredClone(DBState.db.subAgentGraph)
+            agentGraphSession = createRisuAgentGraphSession({
+                graph: activeAgentGraph,
+                formated,
+                currentChar,
+                promptSources: {
+                    chats: promptTemplate
+                        ? unformated.chats
+                        : [...unformated.chats, ...unformated.lastChat],
+                    personaPrompt: unformated.personaPrompt,
+                    description: unformated.description,
+                    descriptionBaseIndex: baseDescriptionPrompt ? beforeDescriptionPrompts.length : undefined,
+                    authorNote: unformated.authorNote,
+                    lorebook: unformated.lorebook,
+                    memory: memories.length > 0 ? memories : agentPromptMemories,
+                    postEverything: unformated.postEverything,
+                    postEndInnerFormat: DBState.db.promptSettings.postEndInnerFormat,
+                    sendChatAsSystem: DBState.db.promptSettings.sendChatAsSystem,
+                    automaticCachePoint: DBState.db.automaticCachePoint,
+                    mergeAdjacentSystemMessages: DBState.db.aiModel.startsWith('gpt')
+                        || DBState.db.aiModel.startsWith('claude')
+                        || DBState.db.aiModel === 'openrouter'
+                        || DBState.db.aiModel === 'reverse_proxy',
+                    jailbreakEnabled: DBState.db.jailbreakToggle,
+                    chainOfThoughtEnabled: DBState.db.chainOfThought,
+                    parsePromptText: (
+                        text: string,
+                        role?: PromptRole,
+                        position?: string,
+                        originalText = text,
+                    ) => {
+                        let content = position ? positionParser(text, position) : text
+                        if (position === 'globalNote') {
+                            if (currentChar.replaceGlobalNote) {
+                                content = positionParser(currentChar.replaceGlobalNote, position)
+                                    .replaceAll('{{original}}', content)
+                            }
+                            if (
+                                currentChar.prebuiltAssetCommand
+                                && !originalText.includes('{{//@customimageinstruction}}')
+                            ) {
+                                content += prebuiltAssetCommand
+                            }
+                        }
+                        return risuChatParser(content, { chara: currentChar, role })
+                    },
+                },
+                signal: abortSignal,
+                firstMessage: currentChat.message.filter((message) => message.role === 'user').length <= 1,
+            })
+            const mainInputs = await agentGraphSession.prepareMain()
+            const guidance = formatAgentGraphGuidance(activeAgentGraph, mainInputs)
+            if(guidance){
+                const insertAt = formated.at(-1)?.role === 'assistant' ? formated.length - 1 : formated.length
+                formated.splice(insertAt, 0, {
+                    role: 'system',
+                    content: guidance,
+                    removable: true,
+                    attr: ['agent-graph-guidance'],
+                })
+            }
+        }
+        catch(error){
+            if(abortSignal.aborted){
+                return false
+            }
+            throwError(`Sub-agent graph: ${error instanceof Error ? error.message : String(error)}`)
+            return false
+        }
+    }
+
     //token rechecking
     let inputTokens = 0
 
@@ -1551,6 +1638,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         return true
     }
 
+    agentGraphSession?.markMainStarted()
     const req = await requestChatData({
         formated: formated,
         biasString: biases,
@@ -1564,6 +1652,7 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         previewBody: arg.previewPrompt,
         escape: nowChatroom.type === 'character' && nowChatroom.escapeOutput,
         rememberToolUsage: DBState.db.rememberToolUsage,
+        noMultiGen: Boolean(agentGraphSession),
     }, 'model', abortSignal)
 
     console.log(req)
@@ -1580,6 +1669,20 @@ export async function sendChat(chatProcessIndex = -1,arg:{
     let result = ''
     let emoChanged = false
     let resendChat = false
+
+    const completeAgentGraph = async (mainOutput:string):Promise<string> => {
+        if(!agentGraphSession || !activeAgentGraph){
+            return mainOutput
+        }
+        const mainResult:GraphModelExecutionResult = {
+            text: mainOutput,
+            model: req.model,
+            inputTokens: generationInfo.inputTokens,
+        }
+        const graphResult = await agentGraphSession.completeMain(mainResult)
+        generationInfo.agentGraphTrace = summarizeAgentGraphTrace(activeAgentGraph, graphResult.trace)
+        return graphResult.output
+    }
     
     if(abortSignal.aborted === true){
         return false
@@ -1756,6 +1859,29 @@ export async function sendChat(chatProcessIndex = -1,arg:{
             return false
         }
 
+        if(agentGraphSession){
+            const mainOutput = result
+            try {
+                result = await completeAgentGraph(mainOutput)
+            }
+            catch(error){
+                if(abortSignal.aborted){
+                    return false
+                }
+                throwError(`Sub-agent graph: ${error instanceof Error ? error.message : String(error)}`)
+                return false
+            }
+            if(DBState.db.removeIncompleteResponse){
+                result = trimUntilPunctuation(result)
+            }
+            if(result !== mainOutput){
+                const finalResult = await processScriptFull(nowChatroom, reformatContent(prefix + result), 'editoutput', msgIndex)
+                DBState.db.characters[selectedChar].chats[selectedChat].message[msgIndex].data = finalResult.data
+                emoChanged = finalResult.emoChanged
+                DBState.db.characters[selectedChar].reloadKeys += 1
+            }
+        }
+
         addRerolls(generationId, Object.values(lastResponseChunk))
 
         DBState.db.characters[selectedChar].chats[selectedChat] = runCurrentChatFunction(DBState.db.characters[selectedChar].chats[selectedChat])
@@ -1793,6 +1919,31 @@ export async function sendChat(chatProcessIndex = -1,arg:{
         }
     }
     else{
+        if(agentGraphSession){
+            try {
+                if(req.type === 'success'){
+                    req.result = await completeAgentGraph(req.result)
+                }
+                else if(req.type === 'multiline'){
+                    const outputs = req.result
+                    const firstCharacterOutput = outputs.findIndex(([role]) => role === 'char')
+                    if(firstCharacterOutput === -1){
+                        throw new Error('Main Model did not return a character output.')
+                    }
+                    outputs[firstCharacterOutput] = [
+                        outputs[firstCharacterOutput][0],
+                        await completeAgentGraph(outputs[firstCharacterOutput][1]),
+                    ]
+                }
+            }
+            catch(error){
+                if(abortSignal.aborted){
+                    return false
+                }
+                throwError(`Sub-agent graph: ${error instanceof Error ? error.message : String(error)}`)
+                return false
+            }
+        }
         const msgs = (req.type === 'success') ? [['char',req.result]] as const 
                     : (req.type === 'multiline') ? req.result
                     : []

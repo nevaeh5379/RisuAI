@@ -41,6 +41,7 @@
     import { allBasicParameterItems } from "src/ts/setting/botSettingsParamsData";
     import SeparateParametersSection from "./SeparateParametersSection.svelte";
     import AuxModelSelectors from './Model/AuxModelSelectors.svelte'
+    import AgentGraphSettings from './AgentGraphSettings.svelte'
     
     const openrouterPinnedItems: ModelGridPinnedItem[] = [
         { id: 'risu/free',       displayName: 'Free Auto',       providerName: 'Risu'       },
@@ -148,8 +149,13 @@
         </button>
         <button onclick={() => {
             submenu = 3
-        }} class="p-2 flex-1" class:bg-darkbutton={submenu === 3}>
+        }} class="p-2 flex-1 border-r border-darkborderc" class:bg-darkbutton={submenu === 3}>
             <span>{language.others}</span>
+        </button>
+        <button onclick={() => {
+            submenu = 4
+        }} class="p-2 flex-1" class:bg-darkbutton={submenu === 4}>
+            <span>Agents</span>
         </button>
     </div>
 {/if}
@@ -844,6 +850,10 @@
     {:else if submenu === 2}
         <PromptSettings mode='inline' />
     {/if}
+{/if}
+
+{#if submenu === 4 || submenu === -1}
+    <AgentGraphSettings />
 {/if}
 
 

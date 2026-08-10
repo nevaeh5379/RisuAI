@@ -21,6 +21,12 @@ import {
     normalizeChatLoadPages,
 } from '../chatLoadPages';
 import { setDatabaseLite } from './databaseState.svelte';
+import {
+    createDefaultAgentGraph,
+    normalizeAgentGraph,
+    type AgentGraph,
+    type AgentGraphTraceEntry,
+} from '../process/agentGraph';
 
 export { onDatabaseUpdate, setDatabaseLite } from './databaseState.svelte';
 
@@ -145,6 +151,10 @@ export function setDatabase(data:Database){
     if(checkNullish(data.subModel)){
         data.subModel = 'gemini-3-flash-preview'
     }
+    data.subAgentGraph = normalizeAgentGraph(
+        data.subAgentGraph,
+        Array.isArray(data.promptTemplate) ? data.promptTemplate : undefined,
+    )
     if(checkNullish(data.waifuWidth)){
         data.waifuWidth = 100
     }
@@ -511,6 +521,10 @@ export function setDatabase(data:Database){
                     ignore: []
                 }
             }
+            preset.subAgentGraph = normalizeAgentGraph(
+                preset.subAgentGraph,
+                Array.isArray(preset.promptTemplate) ? preset.promptTemplate : undefined,
+            )
         }
     }
     data.openrouterProvider ??= {
@@ -844,6 +858,7 @@ export interface Database{
     iconsize:number
     theme: string
     subModel:string
+    subAgentGraph: AgentGraph
     emotionPrompt: string,
     formatversion:number
     waifuWidth:number
@@ -1594,6 +1609,7 @@ export interface botPreset{
     formatingOrder: FormatingOrderItem[]
     aiModel?: string
     subModel?:string
+    subAgentGraph?:AgentGraph
     currentPluginProvider?:string
     textgenWebUIStreamURL?:string
     textgenWebUIBlockingURL?:string
@@ -1869,6 +1885,7 @@ export interface MessageGenerationInfo{
         stage3?: number
         stage4?: number
     }
+    agentGraphTrace?: AgentGraphTraceEntry[]
 }
 
 export interface MessagePresetInfo{
@@ -1999,6 +2016,7 @@ export const presetTemplate:botPreset = {
     formatingOrder: ['main', 'description', 'personaPrompt','chats','lastChat', 'jailbreak', 'lorebook', 'globalNote', 'authorNote'],
     aiModel: "gemini-3-flash-preview",
     subModel: "gemini-3-flash-preview",
+    subAgentGraph: createDefaultAgentGraph(),
     currentPluginProvider: "",
     textgenWebUIStreamURL: '',
     textgenWebUIBlockingURL: '',
@@ -2055,6 +2073,10 @@ export function saveCurrentPreset(){
         formatingOrder: db.formatingOrder,
         aiModel: db.aiModel,
         subModel: db.subModel,
+        subAgentGraph: normalizeAgentGraph(
+            safeStructuredClone(db.subAgentGraph),
+            Array.isArray(db.promptTemplate) ? db.promptTemplate : undefined,
+        ),
         currentPluginProvider: db.currentPluginProvider,
         textgenWebUIStreamURL: db.textgenWebUIStreamURL,
         textgenWebUIBlockingURL: db.textgenWebUIBlockingURL,
@@ -2167,6 +2189,10 @@ export function setPreset(db:Database, newPres: botPreset){
     db.formatingOrder = newPres.formatingOrder ?? db.formatingOrder
     db.aiModel = newPres.aiModel ?? db.aiModel
     db.subModel = newPres.subModel ?? db.subModel
+    db.subAgentGraph = normalizeAgentGraph(
+        safeStructuredClone(newPres.subAgentGraph),
+        Array.isArray(newPres.promptTemplate) ? newPres.promptTemplate : undefined,
+    )
     db.currentPluginProvider = newPres.currentPluginProvider ?? db.currentPluginProvider
     db.textgenWebUIStreamURL = newPres.textgenWebUIStreamURL ?? db.textgenWebUIStreamURL
     db.textgenWebUIBlockingURL = newPres.textgenWebUIBlockingURL ?? db.textgenWebUIBlockingURL
