@@ -98,10 +98,13 @@
     }
 
     async function rm(e:MouseEvent, rec?:boolean){
+        const chat = getCurrentChat();
+        if (!chat) return;
+
         if(e.shiftKey){
-            let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
+            let msg = chat.message
             msg = msg.slice(0, idx)
-            DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
+            chat.message = msg
             return
         }
 
@@ -109,31 +112,31 @@
         if(rm){
             if(DBState.db.instantRemove || rec){
                 const r = await alertConfirm(language.instantRemoveConfirm)
-                let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
+                let msg = chat.message
                 if(!r){
                     msg = msg.slice(0, idx)
                 }
                 else{
                     msg.splice(idx, 1)
                 }
-                DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
+                chat.message = msg
             }
             else{
-                let msg = DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message
+                let msg = chat.message
                 msg.splice(idx, 1)
-                DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message = msg
+                chat.message = msg
             }
         }
     }
 
     async function edit(){
-        DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = message
+        getCurrentChat()!.message[idx].data = message
     }
 
     function handlePartialEditSave(e: CustomEvent<{ newData: string }>) {
         if (idx >= 0) {
             message = e.detail.newData
-            DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage].message[idx].data = e.detail.newData
+            getCurrentChat()!.message[idx].data = e.detail.newData
             displaya(e.detail.newData)
         }
     }
@@ -142,7 +145,7 @@
         try{
             const cbsConditions:CbsConditions = {
                 firstmsg: firstMessage ?? false,
-                chatRole: DBState.db.characters[selIdState.selId].chats[DBState.db.characters[selIdState.selId].chatPage]?.message?.[idx]?.role ?? null,
+                chatRole: getCurrentChat()?.message?.[idx]?.role ?? null,
             }
             return cbsConditions
         }
